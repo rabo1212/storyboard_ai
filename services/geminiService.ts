@@ -49,21 +49,27 @@ export const generateStoryboardScript = async (prompt: string, panelCount: numbe
 export const generatePanelImage = async (visualPrompt: string, style: string): Promise<string> => {
   const ai = getAI();
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash-exp-image-generation',
-    contents: `Generate a storyboard frame image: ${style} style, ${visualPrompt}, no text, cinematic composition`,
+  // Imagen 3 Fast 모델 사용 (고품질, $0.02/장)
+  const response = await ai.models.generateImages({
+    model: 'imagen-3.0-fast-generate-001',
+    prompt: `Storyboard frame, ${style} style, ${visualPrompt}, cinematic composition, professional lighting, no text`,
     config: {
-      responseModalities: ['image', 'text'],
+      numberOfImages: 1,
+      aspectRatio: '16:9',
+      outputMimeType: 'image/png',
     },
   });
 
-  const candidate = response.candidates?.[0];
-  if (!candidate) throw new Error("이미지 생성 결과를 받지 못했습니다.");
-
-  for (const part of candidate.content.parts) {
-    if (part.inlineData) {
-      return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-    }
+  const generatedImage = response.generatedImages?.[0];
+  if (!generatedImage || !generatedImage.image) {
+    throw new Error("이미지 생성 결과를 받지 못했습니다.");
   }
-  throw new Error("응답에서 이미지 데이터를 찾을 수 없습니다.");
+
+  // base64 이미지 데이터 반환
+  const imageData = generatedImage.image.imageBytes;
+  if (!imageData) {
+    throw new Error("이미지 데이터를 찾을 수 없습니다.");
+  }
+
+  return `data:image/png;base64,${imageData}`;
 };
