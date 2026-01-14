@@ -84,26 +84,27 @@ export const generatePanelImage = async (
     ? `${styleContext}. Scene: ${visualPrompt}`
     : `Storyboard frame, ${style} style, ${visualPrompt}`;
 
-  // Imagen 3 모델 사용 (고품질)
-  const response = await ai.models.generateImages({
-    model: 'imagen-3.0-generate-002',
-    prompt: `${consistentPrompt}, cinematic composition, professional lighting, consistent character design, no text, no watermark`,
+  // Gemini 2.0 Flash 이미지 생성 모델 사용
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.0-flash-exp',
+    contents: `Generate an image: ${consistentPrompt}, cinematic composition, professional lighting, consistent character design, no text, no watermark, high quality storyboard frame`,
     config: {
-      numberOfImages: 1,
-      aspectRatio: '16:9',
+      responseModalities: ['image', 'text'],
     },
   });
 
-  const generatedImage = response.generatedImages?.[0];
-  if (!generatedImage || !generatedImage.image) {
+  const candidate = response.candidates?.[0];
+  if (!candidate) {
     throw new Error("이미지 생성 결과를 받지 못했습니다.");
   }
 
-  // base64 이미지 데이터 반환
-  const imageData = generatedImage.image.imageBytes;
-  if (!imageData) {
-    throw new Error("이미지 데이터를 찾을 수 없습니다.");
+  // 이미지 데이터 추출
+  for (const part of candidate.content.parts) {
+    if (part.inlineData) {
+      const mimeType = part.inlineData.mimeType || 'image/png';
+      return `data:${mimeType};base64,${part.inlineData.data}`;
+    }
   }
 
-  return `data:image/png;base64,${imageData}`;
+  throw new Error("응답에서 이미지 데이터를 찾을 수 없습니다.");
 };
