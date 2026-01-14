@@ -7,7 +7,7 @@ import PricingModal from './components/PricingModal.tsx';
 import LoginModal from './components/LoginModal.tsx';
 import AdPlayer from './components/AdPlayer.tsx';
 import { StoryboardProject, PanelStatus, ART_STYLES, PricingTier, User } from './types.ts';
-import { generateStoryboardScript, generatePanelImage } from './services/geminiService.ts';
+import { generateStoryboardScript, generatePanelImage, generateStyleContext } from './services/geminiService.ts';
 
 const App: React.FC = () => {
   const [project, setProject] = useState<StoryboardProject | null>(null);
@@ -114,29 +114,34 @@ const App: React.FC = () => {
 
     setIsGenerating(true);
     setError(null);
-    
+
     try {
       const artStyle = ART_STYLES.find(s => s.id === styleId)?.name || '시네마틱';
       setCurrentUser(prev => prev ? { ...prev, credits: prev.credits - panelCount } : null);
-      
+
+      // 스타일 일관성을 위한 컨텍스트 생성
+      const styleContext = await generateStyleContext(prompt, artStyle);
+
       const initialPanels = await generateStoryboardScript(prompt, panelCount);
-      
+
       const newProject: StoryboardProject = {
         id: `project-${Date.now()}`,
         title: "새 스토리보드 프로젝트",
         originalPrompt: prompt,
         style: artStyle,
+        styleContext, // 스타일 컨텍스트 저장
         status: PanelStatus.GENERATING_IMAGES,
         panels: initialPanels.map(p => ({ ...p, isImageLoading: true })),
         userId: currentUser.email
       };
-      
+
       setProject(newProject);
       setIsGenerating(false);
 
+      // 모든 패널에 동일한 스타일 컨텍스트 적용
       initialPanels.forEach(async (panel) => {
         try {
-          const imageUrl = await generatePanelImage(panel.visualPrompt, artStyle);
+          const imageUrl = await generatePanelImage(panel.visualPrompt, artStyle, styleContext);
           updatePanel(panel.id, { imageUrl, isImageLoading: false });
         } catch (err) {
           updatePanel(panel.id, { isImageLoading: false });
@@ -165,9 +170,10 @@ const App: React.FC = () => {
 
     setCurrentUser(prev => prev ? { ...prev, credits: prev.credits - 1 } : null);
     updatePanel(panelId, { isImageLoading: true });
-    
+
     try {
-      const imageUrl = await generatePanelImage(panel.visualPrompt, project.style);
+      // 저장된 스타일 컨텍스트를 사용하여 일관성 유지
+      const imageUrl = await generatePanelImage(panel.visualPrompt, project.style, project.styleContext);
       updatePanel(panelId, { imageUrl, isImageLoading: false });
     } catch (err) {
       updatePanel(panelId, { isImageLoading: false });

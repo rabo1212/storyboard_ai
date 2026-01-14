@@ -10,11 +10,37 @@ const getAI = () => {
   return new GoogleGenAI({ apiKey });
 };
 
+// 스타일 일관성을 위한 컨텍스트 생성
+export const generateStyleContext = async (prompt: string, style: string): Promise<string> => {
+  const ai = getAI();
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.0-flash',
+    contents: `Based on this story: "${prompt}"
+
+Create a consistent visual style guide for a ${style} storyboard. Include:
+1. Character descriptions (age, hair color, clothing, distinctive features)
+2. Color palette (main colors, lighting mood)
+3. Environment style (setting details, atmosphere)
+4. Art direction notes (line weight, shading style, level of detail)
+
+Output as a single paragraph in English that can be used as a prefix for image generation prompts to maintain visual consistency across all panels.`,
+  });
+
+  return response.text || '';
+};
+
 export const generateStoryboardScript = async (prompt: string, panelCount: number = 4): Promise<StoryboardPanel[]> => {
   const ai = getAI();
   const response = await ai.models.generateContent({
     model: 'gemini-2.0-flash',
-    contents: `스토리보드 생성: ${prompt}, 패널수: ${panelCount}. 한국어로 설명 작성, visualPrompt는 영어로.`,
+    contents: `스토리보드 생성: ${prompt}, 패널수: ${panelCount}.
+
+규칙:
+1. 한국어로 설명(description) 작성
+2. visualPrompt는 영어로 작성
+3. 모든 패널에서 캐릭터의 외모, 의상, 특징을 동일하게 유지
+4. 캐릭터 묘사 시 구체적인 특징 포함 (머리색, 의상 색상, 체형 등)
+5. 배경과 조명 스타일도 일관되게 유지`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -46,13 +72,22 @@ export const generateStoryboardScript = async (prompt: string, panelCount: numbe
   }));
 };
 
-export const generatePanelImage = async (visualPrompt: string, style: string): Promise<string> => {
+export const generatePanelImage = async (
+  visualPrompt: string,
+  style: string,
+  styleContext?: string
+): Promise<string> => {
   const ai = getAI();
+
+  // 스타일 컨텍스트를 포함한 일관된 프롬프트 생성
+  const consistentPrompt = styleContext
+    ? `${styleContext}. Scene: ${visualPrompt}`
+    : `Storyboard frame, ${style} style, ${visualPrompt}`;
 
   // Imagen 3 Fast 모델 사용 (고품질, $0.02/장)
   const response = await ai.models.generateImages({
     model: 'imagen-3.0-fast-generate-001',
-    prompt: `Storyboard frame, ${style} style, ${visualPrompt}, cinematic composition, professional lighting, no text`,
+    prompt: `${consistentPrompt}, cinematic composition, professional lighting, consistent character design, no text, no watermark`,
     config: {
       numberOfImages: 1,
       aspectRatio: '16:9',

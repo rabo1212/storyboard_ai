@@ -23,6 +23,7 @@ export interface StoryboardProject {
   title: string;
   originalPrompt: string;
   style: string;
+  styleContext?: string; // 스타일 일관성을 위한 컨텍스트
   panels: StoryboardPanel[];
   status: PanelStatus;
   userId: string; // 프로젝트 소유자 식별자
