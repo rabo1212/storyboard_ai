@@ -1,0 +1,6 @@
+
+{
+  "name": "비저너리 스토리보드 AI",
+  "description": "스크립트를 시네마틱한 비주얼 패널로 변환해주는 Gemini 기반의 AI 스토리보드 생성기입니다.",
+  "requestFramePermissions": []
+}
