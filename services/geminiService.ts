@@ -84,14 +84,13 @@ export const generatePanelImage = async (
     ? `${styleContext}. Scene: ${visualPrompt}`
     : `Storyboard frame, ${style} style, ${visualPrompt}`;
 
-  // Imagen 3 Fast 모델 사용 (고품질, $0.02/장)
+  // Imagen 3 모델 사용 (고품질)
   const response = await ai.models.generateImages({
-    model: 'imagen-3.0-fast-generate-001',
+    model: 'imagen-3.0-generate-002',
     prompt: `${consistentPrompt}, cinematic composition, professional lighting, consistent character design, no text, no watermark`,
     config: {
       numberOfImages: 1,
       aspectRatio: '16:9',
-      outputMimeType: 'image/png',
     },
   });
 
