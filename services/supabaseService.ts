@@ -56,18 +56,26 @@ export const signUp = async (email: string, password: string): Promise<{ user: S
       console.log('사용자 생성됨:', data.user.id);
 
       // 프로필 직접 생성 시도
-      const { error: insertError } = await sb.from('profiles').upsert({
+      const profileData = {
         id: data.user.id,
         email: data.user.email || email,
         credits: 5,
         daily_ad_count: 0,
         last_ad_date: new Date().toISOString().split('T')[0],
-      });
+      };
+      console.log('프로필 생성 시도:', profileData);
+
+      const { data: insertData, error: insertError } = await sb.from('profiles').upsert(profileData).select();
 
       if (insertError) {
-        console.error('프로필 생성 오류:', insertError);
+        console.error('프로필 생성 오류 상세:', {
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          code: insertError.code,
+        });
       } else {
-        console.log('프로필 생성 성공');
+        console.log('프로필 생성 성공:', insertData);
       }
     }
 
