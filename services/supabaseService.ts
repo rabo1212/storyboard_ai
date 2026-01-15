@@ -5,12 +5,17 @@ import { createClient, SupabaseClient, User as SupabaseUser } from '@supabase/su
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 
+// 디버깅용 로그
+console.log('Supabase URL:', SUPABASE_URL ? '설정됨' : '없음');
+console.log('Supabase Key:', SUPABASE_ANON_KEY ? '설정됨' : '없음');
+
 // Supabase 클라이언트 초기화
 let supabase: SupabaseClient | null = null;
 
 export const getSupabase = (): SupabaseClient => {
   if (!supabase) {
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      console.error('Supabase 환경변수 누락:', { SUPABASE_URL, SUPABASE_ANON_KEY: SUPABASE_ANON_KEY ? '[설정됨]' : '[없음]' });
       throw new Error('Supabase 설정이 필요합니다. 환경변수를 확인해주세요.');
     }
     supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -30,28 +35,39 @@ export interface UserProfile {
 
 // 회원가입
 export const signUp = async (email: string, password: string): Promise<{ user: SupabaseUser | null; error: string | null }> => {
-  const sb = getSupabase();
+  try {
+    console.log('회원가입 시도:', email);
+    const sb = getSupabase();
 
-  const { data, error } = await sb.auth.signUp({
-    email,
-    password,
-  });
+    const { data, error } = await sb.auth.signUp({
+      email,
+      password,
+    });
 
-  if (error) {
-    return { user: null, error: error.message };
-  }
+    console.log('회원가입 응답:', { data, error });
 
-  // 트리거가 자동으로 프로필을 생성함
-  // 프로필 생성 완료 대기 (최대 3초)
-  if (data.user) {
-    for (let i = 0; i < 6; i++) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const profile = await getUserProfile(data.user.id);
-      if (profile) break;
+    if (error) {
+      console.error('회원가입 오류:', error);
+      return { user: null, error: error.message };
     }
-  }
 
-  return { user: data.user, error: null };
+    // 트리거가 자동으로 프로필을 생성함
+    // 프로필 생성 완료 대기 (최대 3초)
+    if (data.user) {
+      console.log('사용자 생성됨:', data.user.id);
+      for (let i = 0; i < 6; i++) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const profile = await getUserProfile(data.user.id);
+        console.log('프로필 조회 시도', i + 1, ':', profile);
+        if (profile) break;
+      }
+    }
+
+    return { user: data.user, error: null };
+  } catch (err: any) {
+    console.error('회원가입 예외:', err);
+    return { user: null, error: err.message || '회원가입 중 오류 발생' };
+  }
 };
 
 // 로그인
