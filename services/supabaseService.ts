@@ -51,15 +51,23 @@ export const signUp = async (email: string, password: string): Promise<{ user: S
       return { user: null, error: error.message };
     }
 
-    // 트리거가 자동으로 프로필을 생성함
-    // 프로필 생성 완료 대기 (최대 3초)
+    // 프로필 수동 생성 (트리거가 실패할 경우 대비)
     if (data.user) {
       console.log('사용자 생성됨:', data.user.id);
-      for (let i = 0; i < 6; i++) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const profile = await getUserProfile(data.user.id);
-        console.log('프로필 조회 시도', i + 1, ':', profile);
-        if (profile) break;
+
+      // 프로필 직접 생성 시도
+      const { error: insertError } = await sb.from('profiles').upsert({
+        id: data.user.id,
+        email: data.user.email || email,
+        credits: 5,
+        daily_ad_count: 0,
+        last_ad_date: new Date().toISOString().split('T')[0],
+      });
+
+      if (insertError) {
+        console.error('프로필 생성 오류:', insertError);
+      } else {
+        console.log('프로필 생성 성공');
       }
     }
 
@@ -107,7 +115,7 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
     .from('profiles')
     .select('*')
     .eq('id', userId)
-    .single();
+    .maybeSingle(); // single() 대신 maybeSingle() 사용 - 없어도 에러 안 남
 
   if (error) {
     console.error('프로필 조회 오류:', error);
