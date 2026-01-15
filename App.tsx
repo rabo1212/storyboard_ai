@@ -7,81 +7,104 @@ import PricingModal from './components/PricingModal.tsx';
 import LoginModal from './components/LoginModal.tsx';
 import AdPlayer from './components/AdPlayer.tsx';
 import AdBanner from './components/AdBanner.tsx';
-import { StoryboardProject, PanelStatus, ART_STYLES, PricingTier, User } from './types.ts';
+import { StoryboardProject, PanelStatus, ART_STYLES, PricingTier } from './types.ts';
 import { generateStoryboardScript, generatePanelImage, generateStyleContext } from './services/geminiService.ts';
 import { parsePaymentSuccess, parsePaymentFail } from './services/paymentService.ts';
+import {
+  UserProfile,
+  getCurrentUser,
+  getUserProfile,
+  signOut,
+  onAuthStateChange,
+  addCredits,
+  deductCredits,
+  updateAdWatch,
+} from './services/supabaseService.ts';
 
 const App: React.FC = () => {
   const [project, setProject] = useState<StoryboardProject | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // 사용자 계정 상태 관리
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      const saved = localStorage.getItem('visionary_current_user');
-      if (!saved) return null;
-      const user: User = JSON.parse(saved);
-      
-      const today = new Date().toDateString();
-      if (user.lastAdDate !== today) {
-        user.dailyAdCount = 0;
-        user.lastAdDate = today;
-      }
-      return user;
-    } catch (e) {
-      return null;
-    }
-  });
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // Supabase 사용자 프로필 상태 관리
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isAdPlaying, setIsAdPlaying] = useState(false);
 
+  // 앱 초기화 시 현재 로그인된 사용자 확인
   useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('visionary_current_user', JSON.stringify(currentUser));
-      const usersStr = localStorage.getItem('visionary_users') || '[]';
-      const users: User[] = JSON.parse(usersStr);
-      const updatedUsers = users.map(u => u.email === currentUser.email ? currentUser : u);
-      localStorage.setItem('visionary_users', JSON.stringify(updatedUsers));
-    }
-  }, [currentUser]);
+    const initAuth = async () => {
+      try {
+        const user = await getCurrentUser();
+        if (user) {
+          const profile = await getUserProfile(user.id);
+          setCurrentUser(profile);
+        }
+      } catch (err) {
+        console.error('인증 초기화 오류:', err);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    initAuth();
+
+    // 인증 상태 변경 구독
+    const { data: { subscription } } = onAuthStateChange(async (user) => {
+      if (user) {
+        const profile = await getUserProfile(user.id);
+        setCurrentUser(profile);
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   // 결제 성공/실패 처리
   useEffect(() => {
-    const handlePaymentResult = () => {
+    const handlePaymentResult = async () => {
       const successResult = parsePaymentSuccess();
       const failResult = parsePaymentFail();
 
-      if (successResult) {
+      if (successResult && currentUser) {
         // 결제 성공 처리
         const pendingPayment = localStorage.getItem('pending_payment');
         if (pendingPayment) {
-          const { tierId, credits } = JSON.parse(pendingPayment);
-          setCurrentUser(prev => prev ? { ...prev, credits: prev.credits + credits } : null);
+          const { credits } = JSON.parse(pendingPayment);
+          const newCredits = await addCredits(currentUser.id, credits);
+          if (newCredits !== null) {
+            setCurrentUser(prev => prev ? { ...prev, credits: newCredits } : null);
+            alert(`결제가 완료되었습니다! ${credits} 크레딧이 지급되었습니다.`);
+          }
           localStorage.removeItem('pending_payment');
-          alert(`결제가 완료되었습니다! ${credits} 크레딧이 지급되었습니다.`);
         }
-        // URL에서 쿼리 파라미터 제거
         window.history.replaceState({}, '', window.location.pathname);
       } else if (failResult) {
-        // 결제 실패 처리
         localStorage.removeItem('pending_payment');
         alert(`결제 실패: ${failResult.error}`);
         window.history.replaceState({}, '', window.location.pathname);
       }
     };
 
-    handlePaymentResult();
-  }, []);
+    if (currentUser) {
+      handlePaymentResult();
+    }
+  }, [currentUser]);
 
-  const handleLoginSuccess = (user: User) => {
-    setCurrentUser(user);
+  const handleLoginSuccess = (profile: UserProfile) => {
+    setCurrentUser(profile);
     setIsLoginOpen(false);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut();
     setCurrentUser(null);
     setProject(null);
   };
@@ -89,11 +112,14 @@ const App: React.FC = () => {
   const handleOpenPricing = () => setIsPricingOpen(true);
   const handleClosePricing = () => setIsPricingOpen(false);
 
-  const handlePurchase = (tier: PricingTier) => {
+  const handlePurchase = async (tier: PricingTier) => {
     if (!currentUser) return;
-    setCurrentUser(prev => prev ? { ...prev, credits: prev.credits + tier.credits } : null);
-    setIsPricingOpen(false);
-    alert(`${tier.name} 결제가 완료되었습니다.`);
+    const newCredits = await addCredits(currentUser.id, tier.credits);
+    if (newCredits !== null) {
+      setCurrentUser(prev => prev ? { ...prev, credits: newCredits } : null);
+      setIsPricingOpen(false);
+      alert(`${tier.name} 결제가 완료되었습니다.`);
+    }
   };
 
   const handleWatchAdTrigger = () => {
@@ -101,8 +127,8 @@ const App: React.FC = () => {
       setIsLoginOpen(true);
       return;
     }
-    const today = new Date().toDateString();
-    if (currentUser.dailyAdCount >= 5 && currentUser.lastAdDate === today) {
+    const today = new Date().toISOString().split('T')[0];
+    if (currentUser.daily_ad_count >= 5 && currentUser.last_ad_date === today) {
       alert("오늘의 무료 광고 시청 한도를 초과했습니다.");
       return;
     }
@@ -110,19 +136,20 @@ const App: React.FC = () => {
     setIsAdPlaying(true);
   };
 
-  const handleAdComplete = () => {
+  const handleAdComplete = async () => {
     setIsAdPlaying(false);
-    const today = new Date().toDateString();
-    setCurrentUser(prev => {
-      if (!prev) return null;
-      return { 
-        ...prev, 
-        credits: prev.credits + 2, 
-        dailyAdCount: prev.dailyAdCount + 1,
-        lastAdDate: today
-      };
-    });
-    alert("보상이 지급되었습니다.");
+    if (!currentUser) return;
+
+    const result = await updateAdWatch(currentUser.id);
+    if (result) {
+      setCurrentUser(prev => prev ? {
+        ...prev,
+        credits: result.credits,
+        daily_ad_count: result.dailyAdCount,
+        last_ad_date: new Date().toISOString().split('T')[0],
+      } : null);
+      alert("보상이 지급되었습니다.");
+    }
   };
 
   const handleAdCancel = () => {
@@ -147,7 +174,13 @@ const App: React.FC = () => {
 
     try {
       const artStyle = ART_STYLES.find(s => s.id === styleId)?.name || '시네마틱';
-      setCurrentUser(prev => prev ? { ...prev, credits: prev.credits - panelCount } : null);
+
+      // 크레딧 차감 (Supabase)
+      const newCredits = await deductCredits(currentUser.id, panelCount);
+      if (newCredits === null) {
+        throw new Error('크레딧 차감에 실패했습니다.');
+      }
+      setCurrentUser(prev => prev ? { ...prev, credits: newCredits } : null);
 
       // 스타일 일관성을 위한 컨텍스트 생성
       const styleContext = await generateStyleContext(prompt, artStyle);
@@ -159,10 +192,10 @@ const App: React.FC = () => {
         title: "새 스토리보드 프로젝트",
         originalPrompt: prompt,
         style: artStyle,
-        styleContext, // 스타일 컨텍스트 저장
+        styleContext,
         status: PanelStatus.GENERATING_IMAGES,
         panels: initialPanels.map(p => ({ ...p, isImageLoading: true })),
-        userId: currentUser.email
+        userId: currentUser.id
       };
 
       setProject(newProject);
@@ -198,11 +231,13 @@ const App: React.FC = () => {
     const panel = project?.panels.find(p => p.id === panelId);
     if (!panel || !project) return;
 
-    setCurrentUser(prev => prev ? { ...prev, credits: prev.credits - 1 } : null);
+    const newCredits = await deductCredits(currentUser.id, 1);
+    if (newCredits === null) return;
+
+    setCurrentUser(prev => prev ? { ...prev, credits: newCredits } : null);
     updatePanel(panelId, { isImageLoading: true });
 
     try {
-      // 저장된 스타일 컨텍스트를 사용하여 일관성 유지
       const imageUrl = await generatePanelImage(panel.visualPrompt, project.style, project.styleContext);
       updatePanel(panelId, { imageUrl, isImageLoading: false });
     } catch (err) {
@@ -215,22 +250,42 @@ const App: React.FC = () => {
     setError(null);
   };
 
+  // 로딩 중 표시
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+        <div className="text-center">
+          <div className="w-10 h-10 border-3 border-gray-700 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-500 text-sm">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // UserProfile을 Header에 전달하기 위한 변환
+  const userForHeader = currentUser ? {
+    email: currentUser.email,
+    credits: currentUser.credits,
+    dailyAdCount: currentUser.daily_ad_count,
+    lastAdDate: currentUser.last_ad_date,
+  } : null;
+
   return (
     <div className="min-h-screen flex flex-col">
-      <Header 
-        credits={currentUser?.credits || 0} 
-        user={currentUser}
-        onLogin={() => setIsLoginOpen(true)} 
+      <Header
+        credits={currentUser?.credits || 0}
+        user={userForHeader}
+        onLogin={() => setIsLoginOpen(true)}
         onLogout={handleLogout}
-        onOpenPricing={handleOpenPricing} 
+        onOpenPricing={handleOpenPricing}
       />
-      
+
       <main className="flex-grow container mx-auto px-4 py-8">
         {!project ? (
-          <PromptForm 
-            onSubmit={handleGenerate} 
-            isLoading={isGenerating} 
-            userCredits={currentUser?.credits || 0} 
+          <PromptForm
+            onSubmit={handleGenerate}
+            isLoading={isGenerating}
+            userCredits={currentUser?.credits || 0}
           />
         ) : (
           <div className="max-w-7xl mx-auto space-y-8">
@@ -245,10 +300,10 @@ const App: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {project.panels.map((panel) => (
-                <StoryboardPanel 
-                  key={panel.id} 
-                  panel={panel} 
-                  onRegenerateImage={handleRegenerateImage} 
+                <StoryboardPanel
+                  key={panel.id}
+                  panel={panel}
+                  onRegenerateImage={handleRegenerateImage}
                 />
               ))}
             </div>
@@ -265,7 +320,7 @@ const App: React.FC = () => {
       <PricingModal
         isOpen={isPricingOpen} onClose={handleClosePricing}
         onPurchase={handlePurchase} onWatchAd={handleWatchAdTrigger}
-        dailyAdCount={currentUser?.dailyAdCount || 0}
+        dailyAdCount={currentUser?.daily_ad_count || 0}
         userEmail={currentUser?.email}
       />
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />

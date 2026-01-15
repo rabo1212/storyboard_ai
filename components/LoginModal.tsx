@@ -1,59 +1,74 @@
 
 import React, { useState } from 'react';
-import { User } from '../types';
+import { signUp, signIn, getUserProfile, UserProfile } from '../services/supabaseService.ts';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoginSuccess: (user: User) => void;
+  onLoginSuccess: (profile: UserProfile) => void;
 }
 
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
-  // 저장된 사용자가 없으면 기본적으로 회원가입 모드로 시작
-  const [isSignUp, setIsSignUp] = useState(() => {
-    const usersStr = localStorage.getItem('visionary_users') || '[]';
-    const users = JSON.parse(usersStr);
-    return users.length === 0;
-  });
+  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const existingUsers = JSON.parse(localStorage.getItem('visionary_users') || '[]');
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
-    const usersStr = localStorage.getItem('visionary_users') || '[]';
-    const users: User[] = JSON.parse(usersStr);
+    try {
+      if (isSignUp) {
+        // 회원가입
+        const { user, error: signUpError } = await signUp(email, password);
 
-    if (isSignUp) {
-      if (users.some(u => u.email === email)) {
-        setError('이미 존재하는 이메일입니다.');
-        return;
-      }
-      const newUser: User = {
-        email,
-        password,
-        credits: 5, // 첫 로그인 시 5크레딧 증정
-        hasReceivedWelcomeBonus: true,
-        dailyAdCount: 0,
-        lastAdDate: new Date().toDateString()
-      };
-      users.push(newUser);
-      localStorage.setItem('visionary_users', JSON.stringify(users));
-      onLoginSuccess(newUser);
-      alert('회원가입을 축하합니다! 5 크레딧이 지급되었습니다.');
-    } else {
-      const user = users.find(u => u.email === email && u.password === password);
-      if (user) {
-        onLoginSuccess(user);
+        if (signUpError) {
+          if (signUpError.includes('already registered')) {
+            setError('이미 가입된 이메일입니다.');
+          } else {
+            setError(signUpError);
+          }
+          return;
+        }
+
+        if (user) {
+          const profile = await getUserProfile(user.id);
+          if (profile) {
+            onLoginSuccess(profile);
+            alert('회원가입을 축하합니다! 5 크레딧이 지급되었습니다.');
+          }
+        }
       } else {
-        setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+        // 로그인
+        const { user, error: signInError } = await signIn(email, password);
+
+        if (signInError) {
+          if (signInError.includes('Invalid login credentials')) {
+            setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+          } else {
+            setError(signInError);
+          }
+          return;
+        }
+
+        if (user) {
+          const profile = await getUserProfile(user.id);
+          if (profile) {
+            onLoginSuccess(profile);
+          } else {
+            setError('프로필을 불러올 수 없습니다.');
+          }
+        }
       }
+    } catch (err: any) {
+      setError(err.message || '오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -66,50 +81,55 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           <p className="text-gray-400 text-sm">비저너리 AI의 창작 커뮤니티에 참여하세요.</p>
         </div>
 
-        {/* 저장된 계정이 없을 때 안내 */}
-        {existingUsers.length === 0 && !isSignUp && (
-          <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-yellow-400 text-xs text-center">
-            저장된 계정이 없습니다. 먼저 회원가입을 진행해주세요.
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">이메일 주소</label>
-            <input 
+            <input
               required
               type="email"
               className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
               placeholder="name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={isLoading}
             />
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">비밀번호</label>
-            <input 
+            <input
               required
               type="password"
+              minLength={6}
               className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
             />
+            {isSignUp && (
+              <p className="text-xs text-gray-500 mt-1 ml-1">비밀번호는 6자 이상이어야 합니다.</p>
+            )}
           </div>
 
           {error && <p className="text-red-400 text-xs text-center">{error}</p>}
 
-          <button 
+          <button
             type="submit"
-            className="w-full py-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-all shadow-lg shadow-indigo-600/20 active:scale-[0.98]"
+            disabled={isLoading}
+            className={`w-full py-4 rounded-xl font-bold transition-all shadow-lg active:scale-[0.98] ${
+              isLoading
+                ? 'bg-gray-700 text-gray-400 cursor-wait'
+                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
+            }`}
           >
-            {isSignUp ? '가입하고 5크레딧 받기' : '로그인'}
+            {isLoading ? '처리 중...' : isSignUp ? '가입하고 5크레딧 받기' : '로그인'}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <button 
-            onClick={() => setIsSignUp(!isSignUp)}
+          <button
+            onClick={() => { setIsSignUp(!isSignUp); setError(''); }}
+            disabled={isLoading}
             className="text-sm text-gray-400 hover:text-white transition-colors"
           >
             {isSignUp ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 지금 가입하세요'}

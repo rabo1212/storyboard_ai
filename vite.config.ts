@@ -9,6 +9,9 @@ export default defineConfig(({ mode }) => {
     // Vercel 배포 시: process.env에서 직접 읽기
     // 로컬 개발 시: loadEnv로 .env.local에서 읽기
     const apiKey = process.env.GEMINI_API_KEY || env.GEMINI_API_KEY || '';
+    const supabaseUrl = process.env.SUPABASE_URL || env.SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || '';
+    const tossClientKey = process.env.TOSS_CLIENT_KEY || env.TOSS_CLIENT_KEY || '';
 
     return {
       server: {
@@ -20,6 +23,9 @@ export default defineConfig(({ mode }) => {
         // 브라우저에서 접근 가능하도록 전역 변수로 정의
         'process.env.API_KEY': JSON.stringify(apiKey),
         'process.env.GEMINI_API_KEY': JSON.stringify(apiKey),
+        'process.env.SUPABASE_URL': JSON.stringify(supabaseUrl),
+        'process.env.SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),
+        'process.env.TOSS_CLIENT_KEY': JSON.stringify(tossClientKey),
       },
       resolve: {
         alias: {
