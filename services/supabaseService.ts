@@ -41,18 +41,13 @@ export const signUp = async (email: string, password: string): Promise<{ user: S
     return { user: null, error: error.message };
   }
 
-  // 프로필 테이블에 초기 데이터 생성
+  // 트리거가 자동으로 프로필을 생성함
+  // 프로필 생성 완료 대기 (최대 3초)
   if (data.user) {
-    const { error: profileError } = await sb.from('profiles').insert({
-      id: data.user.id,
-      email: data.user.email,
-      credits: 5, // 가입 보너스
-      daily_ad_count: 0,
-      last_ad_date: new Date().toISOString().split('T')[0],
-    });
-
-    if (profileError) {
-      console.error('프로필 생성 오류:', profileError);
+    for (let i = 0; i < 6; i++) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const profile = await getUserProfile(data.user.id);
+      if (profile) break;
     }
   }
 
