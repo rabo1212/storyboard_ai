@@ -9,12 +9,19 @@ interface LoginModalProps {
 }
 
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
-  const [isSignUp, setIsSignUp] = useState(false);
+  // 저장된 사용자가 없으면 기본적으로 회원가입 모드로 시작
+  const [isSignUp, setIsSignUp] = useState(() => {
+    const usersStr = localStorage.getItem('visionary_users') || '[]';
+    const users = JSON.parse(usersStr);
+    return users.length === 0;
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
+
+  const existingUsers = JSON.parse(localStorage.getItem('visionary_users') || '[]');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +65,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           <h2 className="text-3xl font-bold mb-2">{isSignUp ? '회원가입' : '로그인'}</h2>
           <p className="text-gray-400 text-sm">비저너리 AI의 창작 커뮤니티에 참여하세요.</p>
         </div>
+
+        {/* 저장된 계정이 없을 때 안내 */}
+        {existingUsers.length === 0 && !isSignUp && (
+          <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-yellow-400 text-xs text-center">
+            저장된 계정이 없습니다. 먼저 회원가입을 진행해주세요.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
