@@ -6,8 +6,10 @@ import StoryboardPanel from './components/StoryboardPanel.tsx';
 import PricingModal from './components/PricingModal.tsx';
 import LoginModal from './components/LoginModal.tsx';
 import AdPlayer from './components/AdPlayer.tsx';
+import AdBanner from './components/AdBanner.tsx';
 import { StoryboardProject, PanelStatus, ART_STYLES, PricingTier, User } from './types.ts';
 import { generateStoryboardScript, generatePanelImage, generateStyleContext } from './services/geminiService.ts';
+import { parsePaymentSuccess, parsePaymentFail } from './services/paymentService.ts';
 
 const App: React.FC = () => {
   const [project, setProject] = useState<StoryboardProject | null>(null);
@@ -45,6 +47,34 @@ const App: React.FC = () => {
       localStorage.setItem('visionary_users', JSON.stringify(updatedUsers));
     }
   }, [currentUser]);
+
+  // 결제 성공/실패 처리
+  useEffect(() => {
+    const handlePaymentResult = () => {
+      const successResult = parsePaymentSuccess();
+      const failResult = parsePaymentFail();
+
+      if (successResult) {
+        // 결제 성공 처리
+        const pendingPayment = localStorage.getItem('pending_payment');
+        if (pendingPayment) {
+          const { tierId, credits } = JSON.parse(pendingPayment);
+          setCurrentUser(prev => prev ? { ...prev, credits: prev.credits + credits } : null);
+          localStorage.removeItem('pending_payment');
+          alert(`결제가 완료되었습니다! ${credits} 크레딧이 지급되었습니다.`);
+        }
+        // URL에서 쿼리 파라미터 제거
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (failResult) {
+        // 결제 실패 처리
+        localStorage.removeItem('pending_payment');
+        alert(`결제 실패: ${failResult.error}`);
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    };
+
+    handlePaymentResult();
+  }, []);
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
@@ -225,12 +255,18 @@ const App: React.FC = () => {
           </div>
         )}
         {error && <div className="mt-4 p-4 bg-red-500/10 border border-red-500 rounded-lg text-red-400 text-center">{error}</div>}
+
+        {/* 광고 배너 */}
+        <div className="mt-12 max-w-4xl mx-auto">
+          <AdBanner className="w-full" />
+        </div>
       </main>
 
-      <PricingModal 
+      <PricingModal
         isOpen={isPricingOpen} onClose={handleClosePricing}
         onPurchase={handlePurchase} onWatchAd={handleWatchAdTrigger}
         dailyAdCount={currentUser?.dailyAdCount || 0}
+        userEmail={currentUser?.email}
       />
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />
       <AdPlayer isOpen={isAdPlaying} onComplete={handleAdComplete} onCancel={handleAdCancel} />
