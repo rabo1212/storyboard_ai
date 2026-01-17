@@ -29,7 +29,9 @@ const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, isLoading, userCredit
           상상하는 이야기를 <span className="gradient-text">현실로 만드세요</span>
         </h2>
         <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-          장면 설명이나 전체 스크립트를 입력해 주세요.<br />
+          장면 설명이나 전체 스크립트를 입력해 주세요.
+        </p>
+        <p className="text-lg text-gray-400 max-w-2xl mx-auto mt-2">
           AI가 전문적인 스토리보드 패널로 구성해 드립니다.
         </p>
       </div>
