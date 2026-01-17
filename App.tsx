@@ -467,17 +467,17 @@ const App: React.FC = () => {
             <div ref={storyboardRef} className="space-y-6 bg-[#0a0a0a] p-6 rounded-2xl">
               {/* 헤더 - 로고 & 제목 */}
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                <div className="flex items-center gap-3">
+                <button onClick={handleReset} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                   <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center">
                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <div>
+                  <div className="text-left">
                     <h1 className="text-xl font-bold">Visionary <span className="text-indigo-400">AI</span></h1>
                     <p className="text-xs text-gray-500">Storyboard Generator</p>
                   </div>
-                </div>
+                </button>
                 <div className="text-right">
                   <h2 className="text-lg font-bold text-white">{project.title}</h2>
                   <p className="text-xs text-gray-500">{project.style} • {new Date().toLocaleDateString('ko-KR')}</p>
