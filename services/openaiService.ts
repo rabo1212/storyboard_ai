@@ -1,4 +1,3 @@
-
 import OpenAI from 'openai';
 import { StoryboardPanel } from "../types.ts";
 
@@ -65,7 +64,7 @@ export const generateStyleContext = async (prompt: string, style: string): Promi
         role: 'user',
         content: `Based on this story: "${prompt}"
 
-Create a CHARACTER CONSISTENCY GUIDE for a ${style} storyboard. This will be used as a PREFIX for every DALL-E image generation.
+Create a CHARACTER CONSISTENCY GUIDE for a ${style} storyboard. This will be used as a PREFIX for every image generation.
 
 Create an extremely detailed character description including:
 1. MAIN CHARACTER:
@@ -82,7 +81,7 @@ Create an extremely detailed character description including:
    - Lighting style
    - Visual style (realistic, anime, etc.)
 
-Output as a single paragraph starting with "CHARACTER:" - keep it under 200 words for DALL-E prompt limits.`
+Output as a single paragraph starting with "CHARACTER:" - keep it under 200 words.`
       }
     ],
     max_tokens: 500,
@@ -112,7 +111,7 @@ Output ONLY valid JSON array, no markdown, no explanations.`
 
 규칙:
 1. description은 한국어로 작성
-2. visualPrompt는 영어로, DALL-E에 최적화된 상세한 설명
+2. visualPrompt는 영어로, 이미지 생성에 최적화된 상세한 설명
 3. 모든 패널에서 캐릭터 외모를 동일하게 묘사
 4. shotType은 다음 중 선택: EXTREME WIDE SHOT, WIDE SHOT, FULL SHOT, MEDIUM WIDE SHOT, MEDIUM SHOT, MEDIUM CLOSE-UP, CLOSE-UP, EXTREME CLOSE-UP, OVER THE SHOULDER, TWO SHOT
 
@@ -123,7 +122,7 @@ JSON 형식:
     "shotType": "MEDIUM SHOT",
     "description": "한국어 장면 설명",
     "dialogue": "대사 (없으면 빈 문자열)",
-    "visualPrompt": "Detailed English description for DALL-E, including character appearance, setting, lighting, mood"
+    "visualPrompt": "Detailed English description for image generation, including character appearance, setting, lighting, mood"
   }
 ]`
       }
@@ -157,7 +156,7 @@ JSON 형식:
   }));
 };
 
-// DALL-E 3로 이미지 생성
+// GPT-4o 이미지 생성 (더 빠르고 일관성 있음)
 export const generatePanelImage = async (
   visualPrompt: string,
   style: string,
@@ -169,7 +168,68 @@ export const generatePanelImage = async (
   // 샷 타입 설명
   const shotDescription = shotType ? getShotDescription(shotType) : 'medium shot';
 
-  // DALL-E 프롬프트 구성 (1000자 제한 고려)
+  // GPT-4o 이미지 생성 프롬프트
+  let imagePrompt: string;
+  
+  if (styleContext) {
+    imagePrompt = `Create a storyboard frame image:
+
+${styleContext}
+
+CAMERA: ${shotDescription}
+
+SCENE: ${visualPrompt}
+
+STYLE: ${style}, cinematic storyboard frame, professional film lighting, 16:9 widescreen aspect ratio, no text overlays, no watermarks, high quality`;
+  } else {
+    imagePrompt = `Create a storyboard frame image:
+
+CAMERA: ${shotDescription}
+
+SCENE: ${visualPrompt}
+
+STYLE: ${style}, cinematic storyboard frame, professional film lighting, 16:9 widescreen aspect ratio, no text overlays, no watermarks, high quality`;
+  }
+
+  try {
+    // GPT-4o 이미지 생성 API 호출
+    const response = await openai.responses.create({
+      model: 'gpt-4o',
+      input: imagePrompt,
+      tools: [{ type: 'image_generation' }],
+      tool_choice: { type: 'image_generation' },
+    });
+
+    // 이미지 데이터 추출
+    const imageData = response.output.find((item: any) => item.type === 'image_generation_call');
+    
+    if (imageData && imageData.result) {
+      // base64 이미지 반환
+      return `data:image/png;base64,${imageData.result}`;
+    }
+
+    throw new Error("이미지 생성 결과를 받지 못했습니다.");
+    
+  } catch (error: any) {
+    console.error('GPT-4o 이미지 생성 오류:', error);
+    
+    // 폴백: DALL-E 3 사용
+    console.log('DALL-E 3로 폴백...');
+    return generatePanelImageFallback(visualPrompt, style, styleContext, shotType);
+  }
+};
+
+// DALL-E 3 폴백 함수
+const generatePanelImageFallback = async (
+  visualPrompt: string,
+  style: string,
+  styleContext?: string,
+  shotType?: string
+): Promise<string> => {
+  const openai = getOpenAI();
+
+  const shotDescription = shotType ? getShotDescription(shotType) : 'medium shot';
+
   let finalPrompt: string;
   
   if (styleContext) {
@@ -188,7 +248,6 @@ ${visualPrompt}
 Style: ${style}, cinematic storyboard frame, professional lighting, no text, no watermarks`;
   }
 
-  // 프롬프트 길이 제한 (DALL-E 3는 4000자 제한)
   if (finalPrompt.length > 3800) {
     finalPrompt = finalPrompt.substring(0, 3800) + '...';
   }
@@ -197,7 +256,7 @@ Style: ${style}, cinematic storyboard frame, professional lighting, no text, no 
     model: 'dall-e-3',
     prompt: finalPrompt,
     n: 1,
-    size: '1792x1024', // 16:9에 가까운 와이드 비율
+    size: '1792x1024',
     quality: 'standard',
     style: 'vivid',
   });
@@ -208,7 +267,6 @@ Style: ${style}, cinematic storyboard frame, professional lighting, no text, no 
     throw new Error("이미지 생성 결과를 받지 못했습니다.");
   }
 
-  // URL을 base64로 변환 (PDF 내보내기 위해)
   try {
     const imageResponse = await fetch(imageUrl);
     const blob = await imageResponse.blob();
@@ -220,7 +278,6 @@ Style: ${style}, cinematic storyboard frame, professional lighting, no text, no 
       reader.readAsDataURL(blob);
     });
   } catch (error) {
-    // base64 변환 실패시 원본 URL 반환
     return imageUrl;
   }
 };
