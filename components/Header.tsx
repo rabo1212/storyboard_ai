@@ -1,5 +1,5 @@
-
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { User } from '../types.ts';
 
 interface HeaderProps {
@@ -14,7 +14,7 @@ const Header: React.FC<HeaderProps> = ({ credits, user, onLogin, onLogout, onOpe
   return (
     <header className="py-6 px-8 border-b border-white/10 glass sticky top-0 z-50">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
-        <div className="flex items-center gap-3">
+        <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
             <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -24,7 +24,7 @@ const Header: React.FC<HeaderProps> = ({ credits, user, onLogin, onLogout, onOpe
             <h1 className="text-xl font-bold tracking-tight">Visionary <span className="text-indigo-400">AI</span></h1>
             <p className="text-xs text-gray-500 font-medium">스토리보드 생성기</p>
           </div>
-        </div>
+        </Link>
         
         <nav className="flex items-center gap-4 md:gap-8">
           {user ? (
