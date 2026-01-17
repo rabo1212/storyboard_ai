@@ -38,7 +38,7 @@ const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, isLoading, userCredit
       </div>
 
       <form onSubmit={handleSubmit} className="glass p-8 rounded-3xl space-y-8 shadow-2xl">
-        {/* 제목 입력칸 추가 */}
+        {/* 제목 입력칸 */}
         <div className="space-y-2">
           <label className="text-sm font-semibold text-gray-300 uppercase tracking-wider ml-1">
             스토리보드 제목
@@ -46,12 +46,13 @@ const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, isLoading, userCredit
           <input
             type="text"
             className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all placeholder-gray-600"
-            placeholder="예: 카페 로맨스 스토리보드"
+            placeholder="예: 카페 로맨스 - 첫 만남"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
         </div>
 
+        {/* 스크립트 입력칸 */}
         <div className="space-y-2">
           <label className="text-sm font-semibold text-gray-300 uppercase tracking-wider ml-1">
             시나리오 / 스크립트

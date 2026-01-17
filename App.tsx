@@ -231,10 +231,15 @@ const App: React.FC = () => {
       setProject(newProject);
       setIsGenerating(false);
 
-      // 모든 패널에 동일한 스타일 컨텍스트 적용
+      // 모든 패널에 동일한 스타일 컨텍스트와 샷 타입 적용
       initialPanels.forEach(async (panel) => {
         try {
-          const imageUrl = await generatePanelImage(panel.visualPrompt, artStyle, styleContext);
+          const imageUrl = await generatePanelImage(
+            panel.visualPrompt, 
+            artStyle, 
+            styleContext,
+            panel.shotType  // 샷 타입 전달
+          );
           updatePanel(panel.id, { imageUrl, isImageLoading: false });
         } catch (err) {
           updatePanel(panel.id, { isImageLoading: false });
@@ -277,7 +282,12 @@ const App: React.FC = () => {
     updatePanel(panelId, { isImageLoading: true });
 
     try {
-      const imageUrl = await generatePanelImage(panel.visualPrompt, project.style, project.styleContext);
+      const imageUrl = await generatePanelImage(
+        panel.visualPrompt, 
+        project.style, 
+        project.styleContext,
+        panel.shotType  // 샷 타입 전달
+      );
       updatePanel(panelId, { imageUrl, isImageLoading: false });
     } catch (err) {
       updatePanel(panelId, { isImageLoading: false });
