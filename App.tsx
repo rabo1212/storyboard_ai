@@ -188,7 +188,11 @@ const App: React.FC = () => {
       setIsLoginOpen(true);
       return;
     }
-    if (currentUser.credits < panelCount) {
+    
+    // 관리자 계정 체크
+    const isAdmin = currentUser.email === '311015330@naver.com';
+    
+    if (!isAdmin && currentUser.credits < panelCount) {
       setError("크레딧이 부족합니다.");
       setIsPricingOpen(true);
       return;
@@ -200,12 +204,14 @@ const App: React.FC = () => {
     try {
       const artStyle = ART_STYLES.find(s => s.id === styleId)?.name || '시네마틱';
 
-      // 크레딧 차감 (Supabase)
-      const newCredits = await deductCredits(currentUser.id, panelCount);
-      if (newCredits === null) {
-        throw new Error('크레딧 차감에 실패했습니다.');
+      // 관리자가 아닐 경우에만 크레딧 차감
+      if (!isAdmin) {
+        const newCredits = await deductCredits(currentUser.id, panelCount);
+        if (newCredits === null) {
+          throw new Error('크레딧 차감에 실패했습니다.');
+        }
+        setCurrentUser(prev => prev ? { ...prev, credits: newCredits } : null);
       }
-      setCurrentUser(prev => prev ? { ...prev, credits: newCredits } : null);
 
       // 스타일 일관성을 위한 컨텍스트 생성
       const styleContext = await generateStyleContext(prompt, artStyle);
@@ -252,14 +258,23 @@ const App: React.FC = () => {
   }, []);
 
   const handleRegenerateImage = async (panelId: string) => {
-    if (!currentUser || currentUser.credits < 1) return;
+    if (!currentUser) return;
+    
+    // 관리자 계정 체크
+    const isAdmin = currentUser.email === '311015330@naver.com';
+    
+    if (!isAdmin && currentUser.credits < 1) return;
+    
     const panel = project?.panels.find(p => p.id === panelId);
     if (!panel || !project) return;
 
-    const newCredits = await deductCredits(currentUser.id, 1);
-    if (newCredits === null) return;
-
-    setCurrentUser(prev => prev ? { ...prev, credits: newCredits } : null);
+    // 관리자가 아닐 경우에만 크레딧 차감
+    if (!isAdmin) {
+      const newCredits = await deductCredits(currentUser.id, 1);
+      if (newCredits === null) return;
+      setCurrentUser(prev => prev ? { ...prev, credits: newCredits } : null);
+    }
+    
     updatePanel(panelId, { isImageLoading: true });
 
     try {
