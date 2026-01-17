@@ -244,7 +244,7 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const handleRegenerateImage = async (panelId: string) => {
+  const handleRegenerateImage = async (panelId: string, newPrompt?: string) => {
     if (!currentUser) return;
     
     const isAdmin = currentUser.email === '311015330@naver.com';
@@ -260,11 +260,17 @@ const App: React.FC = () => {
       setCurrentUser(prev => prev ? { ...prev, credits: newCredits } : null);
     }
     
-    updatePanel(panelId, { isImageLoading: true });
+    // 프롬프트가 수정된 경우 업데이트
+    const promptToUse = newPrompt || panel.visualPrompt;
+    if (newPrompt) {
+      updatePanel(panelId, { visualPrompt: newPrompt, isImageLoading: true });
+    } else {
+      updatePanel(panelId, { isImageLoading: true });
+    }
 
     try {
       const imageUrl = await generatePanelImage(
-        panel.visualPrompt, 
+        promptToUse, 
         project.style, 
         project.styleContext,
         panel.shotType
