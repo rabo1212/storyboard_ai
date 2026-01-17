@@ -214,7 +214,8 @@ const App: React.FC = () => {
       setProject(newProject);
       setIsGenerating(false);
 
-      for (const panel of initialPanels) {
+      // 🚀 병렬 이미지 생성 (모든 패널 동시에!)
+      const imagePromises = initialPanels.map(async (panel) => {
         try {
           const imageUrl = await generatePanelImage(
             panel.visualPrompt, 
@@ -222,12 +223,25 @@ const App: React.FC = () => {
             styleContext,
             panel.shotType
           );
-          updatePanel(panel.id, { imageUrl, isImageLoading: false });
+          return { panelId: panel.id, imageUrl, success: true };
         } catch (err: any) {
           console.error('이미지 생성 오류:', err);
-          updatePanel(panel.id, { isImageLoading: false });
+          return { panelId: panel.id, imageUrl: null, success: false };
         }
-      }
+      });
+
+      // 모든 이미지 생성 완료 대기
+      const results = await Promise.all(imagePromises);
+
+      // 결과 업데이트
+      results.forEach(result => {
+        if (result.success && result.imageUrl) {
+          updatePanel(result.panelId, { imageUrl: result.imageUrl, isImageLoading: false });
+        } else {
+          updatePanel(result.panelId, { isImageLoading: false });
+        }
+      });
+
     } catch (err: any) {
       setError(err.message || "생성 중 오류 발생");
       setIsGenerating(false);
@@ -420,7 +434,7 @@ const App: React.FC = () => {
               </button>
               <div className="text-center">
                 <h2 className="text-2xl font-bold">{project.title}</h2>
-                <p className="text-sm text-gray-500">{project.style} 스타일 • DALL-E 3</p>
+                <p className="text-sm text-gray-500">{project.style} 스타일 • DALL-E 3 (병렬 생성)</p>
               </div>
               <div className="flex gap-2">
                 <button 
