@@ -381,7 +381,7 @@ const App: React.FC = () => {
       
       // ===== 스토리보드 패널들 (2열 그리드) =====
       const panelWidth = (contentWidth - 10) / 2; // 2열, 10mm 간격
-      const imageHeight = panelWidth * 0.5625; // 16:9 비율
+      const imageHeight = panelWidth * 0.5714; // DALL-E 3 비율 (1792x1024 = 1.75:1)
       const panelHeight = imageHeight + 35; // 이미지 + 텍스트 공간
       
       let col = 0;
