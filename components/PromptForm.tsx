@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ART_STYLES } from '../types';
 
 interface PromptFormProps {
@@ -91,7 +92,7 @@ const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, isLoading, userCredit
           type="submit"
           className={`w-full py-5 rounded-2xl font-bold text-xl transition-all flex flex-col items-center justify-center gap-1 ${
             isLoading || isCreditInsufficient
-              ? 'bg-gray-800 text-gray-500 cursor-not-allowed' 
+              ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
               : 'bg-white text-black hover:bg-indigo-50 active:scale-[0.98]'
           }`}
         >
@@ -106,6 +107,15 @@ const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, isLoading, userCredit
             </>
           )}
         </button>
+
+        {/* 약관 안내 */}
+        <p className="text-center text-xs text-gray-500">
+          서비스 이용 시{' '}
+          <Link to="/terms" className="text-indigo-400 hover:text-indigo-300 underline">이용약관</Link>
+          {' '}및{' '}
+          <Link to="/privacy" className="text-indigo-400 hover:text-indigo-300 underline">개인정보처리방침</Link>
+          에 동의하는 것으로 간주됩니다.
+        </p>
       </form>
     </div>
   );
