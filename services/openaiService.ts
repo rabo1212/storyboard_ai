@@ -3,9 +3,9 @@ import OpenAI from 'openai';
 import { StoryboardPanel } from "../types.ts";
 
 const getOpenAI = () => {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
-    throw new Error("OPENAI_API_KEY가 설정되지 않았습니다. Vercel 설정(Settings > Environment Variables)에서 OPENAI_API_KEY를 등록하고 'Redeploy'를 진행해 주세요.");
+    throw new Error("VITE_OPENAI_API_KEY가 설정되지 않았습니다. Vercel 설정(Settings > Environment Variables)에서 VITE_OPENAI_API_KEY를 등록하고 'Redeploy'를 진행해 주세요.");
   }
   return new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
 };
