@@ -49,7 +49,7 @@ const getShotDescription = (shotType: string): string => {
   return `${shotType} shot, cinematic framing`;
 };
 
-// 스타일 일관성을 위한 컨텍스트 생성 (GPT-4 사용)
+// 스타일 일관성을 위한 컨텍스트 생성 (문맥 파악 버전)
 export const generateStyleContext = async (prompt: string, style: string): Promise<string> => {
   const openai = getOpenAI();
   
@@ -58,34 +58,47 @@ export const generateStyleContext = async (prompt: string, style: string): Promi
     messages: [
       {
         role: 'system',
-        content: 'You are a character designer creating consistent character descriptions for storyboards. Output only the character description, no explanations.'
+        content: `You are a visual consistency expert for storyboards. Analyze the story and create a style guide.
+
+CRITICAL RULES:
+1. ONLY describe characters/subjects that are EXPLICITLY mentioned or clearly implied in the story
+2. If the story is about animals, describe ONLY the animals - DO NOT add human characters
+3. If the story is about objects/things, describe ONLY those objects - DO NOT add characters
+4. If the story mentions specific people, describe ONLY those people
+5. NEVER invent or add characters that are not in the original story
+
+Output only the style guide, no explanations.`
       },
       {
         role: 'user',
-        content: `Based on this story: "${prompt}"
+        content: `Story: "${prompt}"
+Art Style: ${style}
 
-Create a CHARACTER CONSISTENCY GUIDE for a ${style} storyboard. This will be used as a PREFIX for every image generation.
+Analyze this story and create a VISUAL CONSISTENCY GUIDE.
 
-Create an extremely detailed character description including:
-1. MAIN CHARACTER:
-   - Exact age, gender, ethnicity
-   - Face shape, eye details, eyebrows
-   - Hair style, color, length
-   - Skin tone
-   - Body type, height
-   - Exact clothing with colors
-   - Distinctive features
+First, identify what the story is actually about:
+- Is it about animals? → Describe only the animals
+- Is it about people? → Describe only those people  
+- Is it about objects/scenes? → Describe only those elements
+- Is it abstract/conceptual? → Focus only on art style
+
+Then create a guide with:
+1. SUBJECTS (only what's in the story):
+   - For animals: species, fur/feather color, eye color, size, distinctive markings
+   - For people: only if explicitly mentioned in story
+   - For objects: material, color, condition
 
 2. ART STYLE:
    - Color palette
    - Lighting style
-   - Visual style (realistic, anime, etc.)
+   - Visual style (${style})
 
-Output as a single paragraph starting with "CHARACTER:" - keep it under 200 words.`
+Output as a single paragraph starting with "STYLE:" - keep it under 150 words.
+DO NOT add any characters or subjects not mentioned in the original story.`
       }
     ],
-    max_tokens: 500,
-    temperature: 0.7,
+    max_tokens: 400,
+    temperature: 0.5,
   });
 
   return response.choices[0]?.message?.content || '';
@@ -101,6 +114,11 @@ export const generateStoryboardScript = async (prompt: string, panelCount: numbe
       {
         role: 'system',
         content: `You are a professional storyboard artist. Create storyboard panels in JSON format.
+
+CRITICAL: Only include characters/subjects that are explicitly mentioned in the user's prompt.
+- If the prompt is about animals, show ONLY animals
+- If the prompt is about people, show ONLY those people
+- DO NOT add random human characters to animal stories
         
 Output ONLY valid JSON array, no markdown, no explanations.`
       },
@@ -111,9 +129,10 @@ Output ONLY valid JSON array, no markdown, no explanations.`
 
 규칙:
 1. description은 한국어로 작성
-2. visualPrompt는 영어로, 이미지 생성에 최적화된 상세한 설명
-3. 모든 패널에서 캐릭터 외모를 동일하게 묘사
-4. shotType은 다음 중 선택: EXTREME WIDE SHOT, WIDE SHOT, FULL SHOT, MEDIUM WIDE SHOT, MEDIUM SHOT, MEDIUM CLOSE-UP, CLOSE-UP, EXTREME CLOSE-UP, OVER THE SHOULDER, TWO SHOT
+2. visualPrompt는 영어로, DALL-E에 최적화된 상세한 설명
+3. 프롬프트에 언급된 캐릭터/대상만 포함 (임의로 사람 추가 금지)
+4. 모든 패널에서 같은 캐릭터는 동일한 외모로 묘사
+5. shotType은 다음 중 선택: EXTREME WIDE SHOT, WIDE SHOT, FULL SHOT, MEDIUM WIDE SHOT, MEDIUM SHOT, MEDIUM CLOSE-UP, CLOSE-UP, EXTREME CLOSE-UP, OVER THE SHOULDER, TWO SHOT
 
 JSON 형식:
 [
@@ -122,7 +141,7 @@ JSON 형식:
     "shotType": "MEDIUM SHOT",
     "description": "한국어 장면 설명",
     "dialogue": "대사 (없으면 빈 문자열)",
-    "visualPrompt": "Detailed English description for image generation, including character appearance, setting, lighting, mood"
+    "visualPrompt": "Detailed English description - include ONLY subjects from the original prompt"
   }
 ]`
       }
@@ -156,7 +175,7 @@ JSON 형식:
   }));
 };
 
-// GPT-4o 이미지 생성 (더 빠르고 일관성 있음)
+// DALL-E 3로 이미지 생성
 export const generatePanelImage = async (
   visualPrompt: string,
   style: string,
@@ -168,68 +187,7 @@ export const generatePanelImage = async (
   // 샷 타입 설명
   const shotDescription = shotType ? getShotDescription(shotType) : 'medium shot';
 
-  // GPT-4o 이미지 생성 프롬프트
-  let imagePrompt: string;
-  
-  if (styleContext) {
-    imagePrompt = `Create a storyboard frame image:
-
-${styleContext}
-
-CAMERA: ${shotDescription}
-
-SCENE: ${visualPrompt}
-
-STYLE: ${style}, cinematic storyboard frame, professional film lighting, 16:9 widescreen aspect ratio, no text overlays, no watermarks, high quality`;
-  } else {
-    imagePrompt = `Create a storyboard frame image:
-
-CAMERA: ${shotDescription}
-
-SCENE: ${visualPrompt}
-
-STYLE: ${style}, cinematic storyboard frame, professional film lighting, 16:9 widescreen aspect ratio, no text overlays, no watermarks, high quality`;
-  }
-
-  try {
-    // GPT-4o 이미지 생성 API 호출
-    const response = await openai.responses.create({
-      model: 'gpt-4o',
-      input: imagePrompt,
-      tools: [{ type: 'image_generation' }],
-      tool_choice: { type: 'image_generation' },
-    });
-
-    // 이미지 데이터 추출
-    const imageData = response.output.find((item: any) => item.type === 'image_generation_call');
-    
-    if (imageData && imageData.result) {
-      // base64 이미지 반환
-      return `data:image/png;base64,${imageData.result}`;
-    }
-
-    throw new Error("이미지 생성 결과를 받지 못했습니다.");
-    
-  } catch (error: any) {
-    console.error('GPT-4o 이미지 생성 오류:', error);
-    
-    // 폴백: DALL-E 3 사용
-    console.log('DALL-E 3로 폴백...');
-    return generatePanelImageFallback(visualPrompt, style, styleContext, shotType);
-  }
-};
-
-// DALL-E 3 폴백 함수
-const generatePanelImageFallback = async (
-  visualPrompt: string,
-  style: string,
-  styleContext?: string,
-  shotType?: string
-): Promise<string> => {
-  const openai = getOpenAI();
-
-  const shotDescription = shotType ? getShotDescription(shotType) : 'medium shot';
-
+  // DALL-E 프롬프트 구성
   let finalPrompt: string;
   
   if (styleContext) {
@@ -248,6 +206,7 @@ ${visualPrompt}
 Style: ${style}, cinematic storyboard frame, professional lighting, no text, no watermarks`;
   }
 
+  // 프롬프트 길이 제한 (DALL-E 3는 4000자 제한)
   if (finalPrompt.length > 3800) {
     finalPrompt = finalPrompt.substring(0, 3800) + '...';
   }
@@ -267,6 +226,7 @@ Style: ${style}, cinematic storyboard frame, professional lighting, no text, no 
     throw new Error("이미지 생성 결과를 받지 못했습니다.");
   }
 
+  // URL을 base64로 변환 (PDF 내보내기 위해)
   try {
     const imageResponse = await fetch(imageUrl);
     const blob = await imageResponse.blob();
