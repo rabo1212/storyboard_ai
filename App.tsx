@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import Header from './components/Header.tsx';
 import Footer from './components/Footer.tsx';
 import PromptForm from './components/PromptForm.tsx';
@@ -14,7 +15,6 @@ import TermsPage from './pages/TermsPage.tsx';
 import AboutPage from './pages/AboutPage.tsx';
 import ContactPage from './pages/ContactPage.tsx';
 import { StoryboardProject, PanelStatus, ART_STYLES, PricingTier } from './types.ts';
-// OpenAI 서비스로 변경
 import { generateStoryboardScript, generatePanelImage, generateStyleContext } from './services/openaiService.ts';
 import { parsePaymentSuccess, parsePaymentFail } from './services/paymentService.ts';
 import {
@@ -38,27 +38,20 @@ const App: React.FC = () => {
 
   const storyboardRef = useRef<HTMLDivElement>(null);
 
-  // Supabase 사용자 프로필 상태 관리
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-
   const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isAdPlaying, setIsAdPlaying] = useState(false);
 
-  // 앱 초기화 시 현재 로그인된 사용자 확인
   useEffect(() => {
     const initAuth = async () => {
       try {
         const user = await getCurrentUser();
         if (user) {
           let profile = await getUserProfile(user.id);
-
-          // 프로필이 없으면 자동 생성
           if (!profile) {
-            console.log('앱 초기화: 프로필 없음, 자동 생성 시도...');
             profile = await createProfile(user.id, user.email || '');
           }
-
           setCurrentUser(profile);
         }
       } catch (err) {
@@ -70,17 +63,12 @@ const App: React.FC = () => {
 
     initAuth();
 
-    // 인증 상태 변경 구독
     const { data: { subscription } } = onAuthStateChange(async (user) => {
       if (user) {
         let profile = await getUserProfile(user.id);
-
-        // 프로필이 없으면 자동 생성
         if (!profile) {
-          console.log('인증 상태 변경: 프로필 없음, 자동 생성 시도...');
           profile = await createProfile(user.id, user.email || '');
         }
-
         setCurrentUser(profile);
       } else {
         setCurrentUser(null);
@@ -92,14 +80,12 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // 결제 성공/실패 처리
   useEffect(() => {
     const handlePaymentResult = async () => {
       const successResult = parsePaymentSuccess();
       const failResult = parsePaymentFail();
 
       if (successResult && currentUser) {
-        // 결제 성공 처리
         const pendingPayment = localStorage.getItem('pending_payment');
         if (pendingPayment) {
           const { credits } = JSON.parse(pendingPayment);
@@ -189,7 +175,6 @@ const App: React.FC = () => {
       return;
     }
     
-    // 관리자 계정 체크
     const isAdmin = currentUser.email === '311015330@naver.com';
     
     if (!isAdmin && currentUser.credits < panelCount) {
@@ -204,7 +189,6 @@ const App: React.FC = () => {
     try {
       const artStyle = ART_STYLES.find(s => s.id === styleId)?.name || '시네마틱';
 
-      // 관리자가 아닐 경우에만 크레딧 차감
       if (!isAdmin) {
         const newCredits = await deductCredits(currentUser.id, panelCount);
         if (newCredits === null) {
@@ -213,9 +197,7 @@ const App: React.FC = () => {
         setCurrentUser(prev => prev ? { ...prev, credits: newCredits } : null);
       }
 
-      // 스타일 일관성을 위한 컨텍스트 생성
       const styleContext = await generateStyleContext(prompt, artStyle);
-
       const initialPanels = await generateStoryboardScript(prompt, panelCount);
 
       const newProject: StoryboardProject = {
@@ -232,8 +214,6 @@ const App: React.FC = () => {
       setProject(newProject);
       setIsGenerating(false);
 
-      // 모든 패널에 동일한 스타일 컨텍스트와 샷 타입 적용
-      // 순차적으로 생성 (DALL-E API 속도 제한 고려)
       for (const panel of initialPanels) {
         try {
           const imageUrl = await generatePanelImage(
@@ -267,7 +247,6 @@ const App: React.FC = () => {
   const handleRegenerateImage = async (panelId: string) => {
     if (!currentUser) return;
     
-    // 관리자 계정 체크
     const isAdmin = currentUser.email === '311015330@naver.com';
     
     if (!isAdmin && currentUser.credits < 1) return;
@@ -275,7 +254,6 @@ const App: React.FC = () => {
     const panel = project?.panels.find(p => p.id === panelId);
     if (!panel || !project) return;
 
-    // 관리자가 아닐 경우에만 크레딧 차감
     if (!isAdmin) {
       const newCredits = await deductCredits(currentUser.id, 1);
       if (newCredits === null) return;
@@ -302,193 +280,87 @@ const App: React.FC = () => {
     setError(null);
   };
 
-  // 개선된 PDF 내보내기 함수
+  // PDF 내보내기 - html2canvas 방식 (한글 지원, 비율 유지)
   const handleExportPDF = async () => {
-    if (!project) return;
+    if (!project || !storyboardRef.current) return;
+    
+    // 모든 이미지가 로딩 완료되었는지 확인
+    const hasLoadingImages = project.panels.some(p => p.isImageLoading);
+    if (hasLoadingImages) {
+      alert('이미지 생성이 완료될 때까지 기다려주세요.');
+      return;
+    }
     
     setIsExporting(true);
     
     try {
-      const pdf = new jsPDF('p', 'mm', 'a4');
+      const element = storyboardRef.current;
+      
+      // html2canvas로 전체 캡처 (화면 그대로 캡처 - 한글 OK)
+      const canvas = await html2canvas(element, {
+        scale: 2, // 고해상도
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#0a0a0a',
+        logging: false,
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      
+      // PDF 생성 (A4 가로 - 스토리보드에 적합)
+      const pdf = new jsPDF('l', 'mm', 'a4'); // 'l' = landscape (가로)
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 15;
-      const contentWidth = pageWidth - (margin * 2);
       
-      // 페이지 배경색 설정
-      pdf.setFillColor(10, 10, 10);
-      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+      // 이미지 비율 유지하면서 페이지에 맞추기
+      const canvasRatio = canvas.width / canvas.height;
+      const pageRatio = pageWidth / pageHeight;
       
-      // ===== 헤더: 브랜드 로고 =====
-      let yPosition = margin;
+      let imgWidth, imgHeight, offsetX, offsetY;
       
-      // 로고 아이콘 (보라색 사각형)
-      pdf.setFillColor(99, 102, 241); // indigo-500
-      pdf.roundedRect(margin, yPosition, 12, 12, 2, 2, 'F');
-      
-      // 로고 안 아이콘 (간단한 카메라 모양)
-      pdf.setFillColor(255, 255, 255);
-      pdf.rect(margin + 3, yPosition + 4, 6, 4, 'F');
-      pdf.circle(margin + 6, yPosition + 6, 1.5, 'F');
-      
-      // 브랜드명
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(18);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Visionary', margin + 16, yPosition + 7);
-      pdf.setTextColor(129, 140, 248); // indigo-400
-      pdf.text('AI', margin + 52, yPosition + 7);
-      
-      // 서브텍스트
-      pdf.setTextColor(107, 114, 128); // gray-500
-      pdf.setFontSize(8);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text('Storyboard Generator', margin + 16, yPosition + 12);
-      
-      yPosition += 20;
-      
-      // 구분선
-      pdf.setDrawColor(255, 255, 255, 0.1);
-      pdf.setLineWidth(0.3);
-      pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-      
-      yPosition += 10;
-      
-      // ===== 스토리보드 제목 =====
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(22);
-      pdf.setFont('helvetica', 'bold');
-      
-      // 제목이 너무 길면 자르기
-      const title = project.title.length > 40 ? project.title.substring(0, 40) + '...' : project.title;
-      pdf.text(title, margin, yPosition + 5);
-      
-      yPosition += 12;
-      
-      // 스타일 태그
-      pdf.setFillColor(99, 102, 241, 0.2);
-      pdf.roundedRect(margin, yPosition, 35, 6, 1, 1, 'F');
-      pdf.setTextColor(129, 140, 248);
-      pdf.setFontSize(8);
-      pdf.text(project.style, margin + 2, yPosition + 4);
-      
-      // 날짜
-      pdf.setTextColor(107, 114, 128);
-      const today = new Date().toLocaleDateString('ko-KR');
-      pdf.text(today, pageWidth - margin - 25, yPosition + 4);
-      
-      yPosition += 15;
-      
-      // ===== 스토리보드 패널들 (2열 그리드) =====
-      const panelWidth = (contentWidth - 10) / 2; // 2열, 10mm 간격
-      const imageHeight = panelWidth * 0.5714; // DALL-E 3 비율 (1792x1024 = 1.75:1)
-      const panelHeight = imageHeight + 35; // 이미지 + 텍스트 공간
-      
-      let col = 0;
-      let row = 0;
-      
-      for (let i = 0; i < project.panels.length; i++) {
-        const panel = project.panels[i];
-        
-        // 새 페이지 필요 체크
-        if (yPosition + panelHeight > pageHeight - margin) {
-          pdf.addPage();
-          pdf.setFillColor(10, 10, 10);
-          pdf.rect(0, 0, pageWidth, pageHeight, 'F');
-          yPosition = margin;
-          row = 0;
-        }
-        
-        const xPosition = margin + (col * (panelWidth + 10));
-        const currentY = yPosition + (row * (panelHeight + 10));
-        
-        // 패널 배경
-        pdf.setFillColor(23, 23, 23);
-        pdf.roundedRect(xPosition, currentY, panelWidth, panelHeight, 3, 3, 'F');
-        
-        // 이미지 영역
-        if (panel.imageUrl) {
-          try {
-            // base64 이미지를 PDF에 추가 (비율 유지)
-            pdf.addImage(
-              panel.imageUrl, 
-              'PNG', 
-              xPosition + 2, 
-              currentY + 2, 
-              panelWidth - 4, 
-              imageHeight - 4,
-              undefined,
-              'MEDIUM'
-            );
-          } catch (imgErr) {
-            // 이미지 로드 실패시 플레이스홀더
-            pdf.setFillColor(38, 38, 38);
-            pdf.rect(xPosition + 2, currentY + 2, panelWidth - 4, imageHeight - 4, 'F');
-            pdf.setTextColor(107, 114, 128);
-            pdf.setFontSize(8);
-            pdf.text('Image', xPosition + panelWidth/2 - 5, currentY + imageHeight/2);
-          }
-        } else {
-          pdf.setFillColor(38, 38, 38);
-          pdf.rect(xPosition + 2, currentY + 2, panelWidth - 4, imageHeight - 4, 'F');
-        }
-        
-        // 장면 번호 뱃지
-        pdf.setFillColor(0, 0, 0, 0.6);
-        pdf.roundedRect(xPosition + 4, currentY + 4, 18, 5, 1, 1, 'F');
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFontSize(6);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(`SCENE #${panel.sceneNumber}`, xPosition + 5, currentY + 7.5);
-        
-        // 샷 타입
-        pdf.setTextColor(129, 140, 248);
-        pdf.setFontSize(7);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(panel.shotType.toUpperCase(), xPosition + 4, currentY + imageHeight + 5);
-        
-        // 설명 텍스트 (줄바꿈 처리)
-        pdf.setTextColor(209, 213, 219);
-        pdf.setFontSize(7);
-        pdf.setFont('helvetica', 'normal');
-        
-        const maxCharsPerLine = Math.floor((panelWidth - 8) / 1.8);
-        const descLines = splitText(panel.description, maxCharsPerLine, 3);
-        descLines.forEach((line, lineIndex) => {
-          pdf.text(line, xPosition + 4, currentY + imageHeight + 10 + (lineIndex * 4));
-        });
-        
-        // 대사가 있으면 표시
-        if (panel.dialogue) {
-          pdf.setTextColor(129, 140, 248, 0.8);
-          pdf.setFontSize(6);
-          pdf.setFont('helvetica', 'italic');
-          const dialogueText = `"${panel.dialogue.substring(0, 50)}${panel.dialogue.length > 50 ? '...' : ''}"`;
-          pdf.text(dialogueText, xPosition + 4, currentY + imageHeight + 26);
-        }
-        
-        // 다음 위치 계산
-        col++;
-        if (col >= 2) {
-          col = 0;
-          row++;
-        }
+      if (canvasRatio > pageRatio) {
+        // 캔버스가 더 넓음 - 너비에 맞춤
+        imgWidth = pageWidth - 20;
+        imgHeight = imgWidth / canvasRatio;
+        offsetX = 10;
+        offsetY = (pageHeight - imgHeight) / 2;
+      } else {
+        // 캔버스가 더 높음 - 높이에 맞춤
+        imgHeight = pageHeight - 20;
+        imgWidth = imgHeight * canvasRatio;
+        offsetX = (pageWidth - imgWidth) / 2;
+        offsetY = 10;
       }
       
-      // ===== 푸터 =====
-      const lastPage = pdf.getNumberOfPages();
-      for (let p = 1; p <= lastPage; p++) {
-        pdf.setPage(p);
-        pdf.setTextColor(75, 85, 99);
-        pdf.setFontSize(7);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text(`Page ${p} of ${lastPage}`, pageWidth / 2 - 10, pageHeight - 8);
-        pdf.text('Generated by Visionary Storyboard AI', margin, pageHeight - 8);
-        pdf.text('© Studio RNU', pageWidth - margin - 20, pageHeight - 8);
+      // 이미지가 페이지보다 큰 경우 여러 페이지로 분할
+      const totalPages = Math.ceil(canvas.height / (canvas.width * (pageHeight / pageWidth)));
+      
+      if (totalPages <= 1) {
+        // 한 페이지에 들어가는 경우
+        pdf.addImage(imgData, 'PNG', offsetX, offsetY, imgWidth, imgHeight);
+      } else {
+        // 여러 페이지로 분할
+        const sourceHeight = canvas.width * (pageHeight / pageWidth) * (canvas.height / imgHeight);
+        
+        for (let page = 0; page < totalPages; page++) {
+          if (page > 0) pdf.addPage();
+          
+          // 페이지별로 캔버스의 일부분만 그리기
+          const sourceY = page * (canvas.height / totalPages);
+          
+          pdf.addImage(
+            imgData, 
+            'PNG', 
+            10, 
+            10, 
+            pageWidth - 20, 
+            pageHeight - 20
+          );
+        }
       }
       
       // PDF 다운로드
-      const fileName = `${project.title.replace(/[^a-zA-Z0-9가-힣]/g, '_')}-${Date.now()}.pdf`;
+      const fileName = `${project.title.replace(/[^a-zA-Z0-9가-힣\s]/g, '')}-${Date.now()}.pdf`;
       pdf.save(fileName);
       
     } catch (err) {
@@ -498,36 +370,7 @@ const App: React.FC = () => {
       setIsExporting(false);
     }
   };
-  
-  // 텍스트 줄바꿈 헬퍼 함수
-  const splitText = (text: string, maxChars: number, maxLines: number): string[] => {
-    const words = text.split('');
-    const lines: string[] = [];
-    let currentLine = '';
-    
-    for (const char of words) {
-      if (currentLine.length >= maxChars) {
-        lines.push(currentLine);
-        currentLine = char;
-        if (lines.length >= maxLines) break;
-      } else {
-        currentLine += char;
-      }
-    }
-    
-    if (currentLine && lines.length < maxLines) {
-      lines.push(currentLine);
-    }
-    
-    // 마지막 줄이 잘렸으면 ... 추가
-    if (lines.length === maxLines && text.length > lines.join('').length) {
-      lines[maxLines - 1] = lines[maxLines - 1].slice(0, -3) + '...';
-    }
-    
-    return lines;
-  };
 
-  // 로딩 중 표시
   if (isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
@@ -539,7 +382,6 @@ const App: React.FC = () => {
     );
   }
 
-  // UserProfile을 Header에 전달하기 위한 변환
   const userForHeader = currentUser ? {
     email: currentUser.email,
     credits: currentUser.credits,
@@ -547,7 +389,6 @@ const App: React.FC = () => {
     lastAdDate: currentUser.last_ad_date,
   } : null;
 
-  // 홈 페이지 콘텐츠
   const HomePage = () => (
     <>
       <Header
@@ -601,20 +442,48 @@ const App: React.FC = () => {
                 </button>
               </div>
             </div>
-            <div ref={storyboardRef} className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {project.panels.map((panel) => (
-                <StoryboardPanel
-                  key={panel.id}
-                  panel={panel}
-                  onRegenerateImage={handleRegenerateImage}
-                />
-              ))}
+            
+            {/* PDF로 캡처될 영역 */}
+            <div ref={storyboardRef} className="space-y-6 bg-[#0a0a0a] p-6 rounded-2xl">
+              {/* 헤더 - 로고 & 제목 */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold">Visionary <span className="text-indigo-400">AI</span></h1>
+                    <p className="text-xs text-gray-500">Storyboard Generator</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <h2 className="text-lg font-bold text-white">{project.title}</h2>
+                  <p className="text-xs text-gray-500">{project.style} • {new Date().toLocaleDateString('ko-KR')}</p>
+                </div>
+              </div>
+              
+              {/* 스토리보드 패널 그리드 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {project.panels.map((panel) => (
+                  <StoryboardPanel
+                    key={panel.id}
+                    panel={panel}
+                    onRegenerateImage={handleRegenerateImage}
+                  />
+                ))}
+              </div>
+              
+              {/* 푸터 */}
+              <div className="text-center text-xs text-gray-600 pt-4 border-t border-white/10">
+                Generated by Visionary Storyboard AI • © Studio RNU
+              </div>
             </div>
           </div>
         )}
         {error && <div className="mt-4 p-4 bg-red-500/10 border border-red-500 rounded-lg text-red-400 text-center">{error}</div>}
 
-        {/* 광고 배너 */}
         <div className="mt-12 max-w-4xl mx-auto">
           <AdBanner className="w-full" />
         </div>
