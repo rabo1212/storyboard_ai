@@ -7,9 +7,9 @@ const Footer: React.FC = () => {
   return (
     <footer className="bg-black/50 border-t border-white/5 mt-auto">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl">
           {/* 브랜드 섹션 */}
-          <div className="md:col-span-1">
+          <div>
             <Link to="/" className="inline-block mb-4">
               <h3 className="text-xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
                 Visionary Storyboard AI
@@ -21,28 +21,29 @@ const Footer: React.FC = () => {
             </p>
           </div>
 
-          {/* 서비스 링크 */}
-          <div>
-            <h4 className="text-white font-bold mb-4">서비스</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/about" className="text-gray-400 hover:text-white transition-colors text-sm">
-                  서비스 소개
-                </Link>
-              </li>
-            </ul>
-          </div>
+          {/* 링크 섹션 */}
+          <div className="flex gap-16">
+            <div>
+              <h4 className="text-white font-bold mb-4">서비스</h4>
+              <ul className="space-y-2">
+                <li>
+                  <Link to="/about" className="text-gray-400 hover:text-white transition-colors text-sm">
+                    서비스 소개
+                  </Link>
+                </li>
+              </ul>
+            </div>
 
-          {/* 고객지원 링크 */}
-          <div>
-            <h4 className="text-white font-bold mb-4">고객지원</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/contact" className="text-gray-400 hover:text-white transition-colors text-sm">
-                  문의하기
-                </Link>
-              </li>
-            </ul>
+            <div>
+              <h4 className="text-white font-bold mb-4">고객지원</h4>
+              <ul className="space-y-2">
+                <li>
+                  <Link to="/contact" className="text-gray-400 hover:text-white transition-colors text-sm">
+                    문의하기
+                  </Link>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 
