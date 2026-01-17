@@ -146,7 +146,20 @@ JSON 형식:
   }
   cleanedText = cleanedText.trim();
 
-  const parsed = JSON.parse(cleanedText);
+  // JSON 배열 추출 (혹시 다른 텍스트가 섞여있을 경우)
+  const jsonMatch = cleanedText.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) {
+    throw new Error("스토리보드 생성 실패: JSON 형식 오류");
+  }
+  cleanedText = jsonMatch[0];
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleanedText);
+  } catch (e) {
+    console.error("JSON 파싱 실패:", cleanedText);
+    throw new Error("스토리보드 생성 실패: JSON 파싱 오류");
+  }
   
   return parsed.map((item: any, index: number) => ({
     ...item,
