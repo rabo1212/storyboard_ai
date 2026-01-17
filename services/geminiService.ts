@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { StoryboardPanel } from "../types.ts";
 
@@ -84,27 +83,24 @@ export const generatePanelImage = async (
     ? `${styleContext}. Scene: ${visualPrompt}`
     : `Storyboard frame, ${style} style, ${visualPrompt}`;
 
-  // Gemini 2.0 Flash 이미지 생성 모델 사용
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash-exp',
-    contents: `Generate an image: ${consistentPrompt}, cinematic composition, professional lighting, consistent character design, no text, no watermark, high quality storyboard frame`,
+  // Imagen 3 모델 사용 (고퀄리티 이미지 생성)
+  const response = await ai.models.generateImages({
+    model: 'imagen-3.0-generate-002',
+    prompt: `${consistentPrompt}, cinematic composition, professional lighting, consistent character design, no text, no watermark, high quality storyboard frame, photorealistic details`,
     config: {
-      responseModalities: ['image', 'text'],
+      numberOfImages: 1,
+      aspectRatio: '16:9',
+      outputMimeType: 'image/png',
     },
   });
 
-  const candidate = response.candidates?.[0];
-  if (!candidate) {
-    throw new Error("이미지 생성 결과를 받지 못했습니다.");
-  }
-
   // 이미지 데이터 추출
-  for (const part of candidate.content.parts) {
-    if (part.inlineData) {
-      const mimeType = part.inlineData.mimeType || 'image/png';
-      return `data:${mimeType};base64,${part.inlineData.data}`;
+  if (response.generatedImages && response.generatedImages.length > 0) {
+    const image = response.generatedImages[0];
+    if (image.image && image.image.imageBytes) {
+      return `data:image/png;base64,${image.image.imageBytes}`;
     }
   }
 
-  throw new Error("응답에서 이미지 데이터를 찾을 수 없습니다.");
+  throw new Error("이미지 생성 결과를 받지 못했습니다.");
 };
