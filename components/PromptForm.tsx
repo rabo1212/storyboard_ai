@@ -4,12 +4,13 @@ import { Link } from 'react-router-dom';
 import { ART_STYLES } from '../types';
 
 interface PromptFormProps {
-  onSubmit: (prompt: string, style: string, panelCount: number) => void;
+  onSubmit: (prompt: string, style: string, panelCount: number, title: string) => void;
   isLoading: boolean;
   userCredits: number;
 }
 
 const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, isLoading, userCredits }) => {
+  const [title, setTitle] = useState('');
   const [prompt, setPrompt] = useState('');
   const [style, setStyle] = useState(ART_STYLES[0].id);
   const [panels, setPanels] = useState(4);
@@ -17,7 +18,7 @@ const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, isLoading, userCredit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isLoading) return;
-    onSubmit(prompt, style, panels);
+    onSubmit(prompt, style, panels, title || '새 스토리보드');
   };
 
   const isCreditInsufficient = userCredits < panels;
@@ -37,6 +38,20 @@ const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, isLoading, userCredit
       </div>
 
       <form onSubmit={handleSubmit} className="glass p-8 rounded-3xl space-y-8 shadow-2xl">
+        {/* 제목 입력칸 추가 */}
+        <div className="space-y-2">
+          <label className="text-sm font-semibold text-gray-300 uppercase tracking-wider ml-1">
+            스토리보드 제목
+          </label>
+          <input
+            type="text"
+            className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all placeholder-gray-600"
+            placeholder="예: 카페 로맨스 스토리보드"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </div>
+
         <div className="space-y-2">
           <label className="text-sm font-semibold text-gray-300 uppercase tracking-wider ml-1">
             시나리오 / 스크립트

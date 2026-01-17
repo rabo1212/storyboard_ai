@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import Header from './components/Header.tsx';
 import Footer from './components/Footer.tsx';
 import PromptForm from './components/PromptForm.tsx';
@@ -183,7 +182,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleGenerate = async (prompt: string, styleId: string, panelCount: number) => {
+  const handleGenerate = async (prompt: string, styleId: string, panelCount: number, title: string) => {
     if (!currentUser) {
       setIsLoginOpen(true);
       return;
@@ -220,7 +219,7 @@ const App: React.FC = () => {
 
       const newProject: StoryboardProject = {
         id: `project-${Date.now()}`,
-        title: "새 스토리보드 프로젝트",
+        title: title || "새 스토리보드 프로젝트",
         originalPrompt: prompt,
         style: artStyle,
         styleContext,
@@ -290,52 +289,199 @@ const App: React.FC = () => {
     setError(null);
   };
 
-  // PDF 내보내기 함수
+  // 개선된 PDF 내보내기 함수
   const handleExportPDF = async () => {
-    if (!project || !storyboardRef.current) return;
+    if (!project) return;
     
     setIsExporting(true);
     
     try {
-      const element = storyboardRef.current;
-      
-      // html2canvas로 전체 캡처
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#0a0a0a',
-        logging: false,
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      
-      // PDF 생성
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - (margin * 2);
       
-      // 이미지 비율 계산
-      const imgWidth = pageWidth - 20;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      // 페이지 배경색 설정
+      pdf.setFillColor(10, 10, 10);
+      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
       
-      let heightLeft = imgHeight;
-      let position = 10;
+      // ===== 헤더: 브랜드 로고 =====
+      let yPosition = margin;
       
-      // 첫 페이지
-      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-      heightLeft -= (pageHeight - 20);
+      // 로고 아이콘 (보라색 사각형)
+      pdf.setFillColor(99, 102, 241); // indigo-500
+      pdf.roundedRect(margin, yPosition, 12, 12, 2, 2, 'F');
       
-      // 여러 페이지 처리
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight + 10;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-        heightLeft -= (pageHeight - 20);
+      // 로고 안 아이콘 (간단한 카메라 모양)
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(margin + 3, yPosition + 4, 6, 4, 'F');
+      pdf.circle(margin + 6, yPosition + 6, 1.5, 'F');
+      
+      // 브랜드명
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(18);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Visionary', margin + 16, yPosition + 7);
+      pdf.setTextColor(129, 140, 248); // indigo-400
+      pdf.text('AI', margin + 52, yPosition + 7);
+      
+      // 서브텍스트
+      pdf.setTextColor(107, 114, 128); // gray-500
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text('Storyboard Generator', margin + 16, yPosition + 12);
+      
+      yPosition += 20;
+      
+      // 구분선
+      pdf.setDrawColor(255, 255, 255, 0.1);
+      pdf.setLineWidth(0.3);
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+      
+      yPosition += 10;
+      
+      // ===== 스토리보드 제목 =====
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(22);
+      pdf.setFont('helvetica', 'bold');
+      
+      // 제목이 너무 길면 자르기
+      const title = project.title.length > 40 ? project.title.substring(0, 40) + '...' : project.title;
+      pdf.text(title, margin, yPosition + 5);
+      
+      yPosition += 12;
+      
+      // 스타일 태그
+      pdf.setFillColor(99, 102, 241, 0.2);
+      pdf.roundedRect(margin, yPosition, 35, 6, 1, 1, 'F');
+      pdf.setTextColor(129, 140, 248);
+      pdf.setFontSize(8);
+      pdf.text(project.style, margin + 2, yPosition + 4);
+      
+      // 날짜
+      pdf.setTextColor(107, 114, 128);
+      const today = new Date().toLocaleDateString('ko-KR');
+      pdf.text(today, pageWidth - margin - 25, yPosition + 4);
+      
+      yPosition += 15;
+      
+      // ===== 스토리보드 패널들 (2열 그리드) =====
+      const panelWidth = (contentWidth - 10) / 2; // 2열, 10mm 간격
+      const imageHeight = panelWidth * 0.5625; // 16:9 비율
+      const panelHeight = imageHeight + 35; // 이미지 + 텍스트 공간
+      
+      let col = 0;
+      let row = 0;
+      
+      for (let i = 0; i < project.panels.length; i++) {
+        const panel = project.panels[i];
+        
+        // 새 페이지 필요 체크
+        if (yPosition + panelHeight > pageHeight - margin) {
+          pdf.addPage();
+          pdf.setFillColor(10, 10, 10);
+          pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+          yPosition = margin;
+          row = 0;
+        }
+        
+        const xPosition = margin + (col * (panelWidth + 10));
+        const currentY = yPosition + (row * (panelHeight + 10));
+        
+        // 패널 배경
+        pdf.setFillColor(23, 23, 23);
+        pdf.roundedRect(xPosition, currentY, panelWidth, panelHeight, 3, 3, 'F');
+        
+        // 이미지 영역
+        if (panel.imageUrl) {
+          try {
+            // base64 이미지를 PDF에 추가 (비율 유지)
+            pdf.addImage(
+              panel.imageUrl, 
+              'PNG', 
+              xPosition + 2, 
+              currentY + 2, 
+              panelWidth - 4, 
+              imageHeight - 4,
+              undefined,
+              'MEDIUM'
+            );
+          } catch (imgErr) {
+            // 이미지 로드 실패시 플레이스홀더
+            pdf.setFillColor(38, 38, 38);
+            pdf.rect(xPosition + 2, currentY + 2, panelWidth - 4, imageHeight - 4, 'F');
+            pdf.setTextColor(107, 114, 128);
+            pdf.setFontSize(8);
+            pdf.text('Image', xPosition + panelWidth/2 - 5, currentY + imageHeight/2);
+          }
+        } else {
+          pdf.setFillColor(38, 38, 38);
+          pdf.rect(xPosition + 2, currentY + 2, panelWidth - 4, imageHeight - 4, 'F');
+        }
+        
+        // 장면 번호 뱃지
+        pdf.setFillColor(0, 0, 0, 0.6);
+        pdf.roundedRect(xPosition + 4, currentY + 4, 18, 5, 1, 1, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(6);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`SCENE #${panel.sceneNumber}`, xPosition + 5, currentY + 7.5);
+        
+        // 샷 타입
+        pdf.setTextColor(129, 140, 248);
+        pdf.setFontSize(7);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(panel.shotType.toUpperCase(), xPosition + 4, currentY + imageHeight + 5);
+        
+        // 설명 텍스트 (줄바꿈 처리)
+        pdf.setTextColor(209, 213, 219);
+        pdf.setFontSize(7);
+        pdf.setFont('helvetica', 'normal');
+        
+        const maxCharsPerLine = Math.floor((panelWidth - 8) / 1.8);
+        const descLines = splitText(panel.description, maxCharsPerLine, 3);
+        descLines.forEach((line, lineIndex) => {
+          pdf.text(line, xPosition + 4, currentY + imageHeight + 10 + (lineIndex * 4));
+        });
+        
+        // 대사가 있으면 표시
+        if (panel.dialogue) {
+          pdf.setTextColor(129, 140, 248, 0.8);
+          pdf.setFontSize(6);
+          pdf.setFont('helvetica', 'italic');
+          const dialogueText = `"${panel.dialogue.substring(0, 50)}${panel.dialogue.length > 50 ? '...' : ''}"`;
+          pdf.text(dialogueText, xPosition + 4, currentY + imageHeight + 26);
+        }
+        
+        // 다음 위치 계산
+        col++;
+        if (col >= 2) {
+          col = 0;
+          row++;
+        }
+      }
+      
+      // 마지막으로 row가 증가했으면 yPosition 업데이트
+      if (col === 0 && row > 0) {
+        // 이미 다음 행으로 넘어감
+      }
+      
+      // ===== 푸터 =====
+      const lastPage = pdf.getNumberOfPages();
+      for (let p = 1; p <= lastPage; p++) {
+        pdf.setPage(p);
+        pdf.setTextColor(75, 85, 99);
+        pdf.setFontSize(7);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`Page ${p} of ${lastPage}`, pageWidth / 2 - 10, pageHeight - 8);
+        pdf.text('Generated by Visionary Storyboard AI', margin, pageHeight - 8);
+        pdf.text('© Studio RNU', pageWidth - margin - 20, pageHeight - 8);
       }
       
       // PDF 다운로드
-      pdf.save(`storyboard-${Date.now()}.pdf`);
+      const fileName = `${project.title.replace(/[^a-zA-Z0-9가-힣]/g, '_')}-${Date.now()}.pdf`;
+      pdf.save(fileName);
       
     } catch (err) {
       console.error('PDF 내보내기 오류:', err);
@@ -343,6 +489,34 @@ const App: React.FC = () => {
     } finally {
       setIsExporting(false);
     }
+  };
+  
+  // 텍스트 줄바꿈 헬퍼 함수
+  const splitText = (text: string, maxChars: number, maxLines: number): string[] => {
+    const words = text.split('');
+    const lines: string[] = [];
+    let currentLine = '';
+    
+    for (const char of words) {
+      if (currentLine.length >= maxChars) {
+        lines.push(currentLine);
+        currentLine = char;
+        if (lines.length >= maxLines) break;
+      } else {
+        currentLine += char;
+      }
+    }
+    
+    if (currentLine && lines.length < maxLines) {
+      lines.push(currentLine);
+    }
+    
+    // 마지막 줄이 잘렸으면 ... 추가
+    if (lines.length === maxLines && text.length > lines.join('').length) {
+      lines[maxLines - 1] = lines[maxLines - 1].slice(0, -3) + '...';
+    }
+    
+    return lines;
   };
 
   // 로딩 중 표시
@@ -389,7 +563,10 @@ const App: React.FC = () => {
               <button onClick={handleReset} className="text-gray-400 hover:text-white flex items-center gap-2">
                 ← 돌아가기
               </button>
-              <h2 className="text-2xl font-bold">{project.style} 스토리보드</h2>
+              <div className="text-center">
+                <h2 className="text-2xl font-bold">{project.title}</h2>
+                <p className="text-sm text-gray-500">{project.style} 스타일</p>
+              </div>
               <div className="flex gap-2">
                 <button 
                   onClick={handleExportPDF}
