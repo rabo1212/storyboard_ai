@@ -33,8 +33,41 @@ export interface UserProfile {
   created_at: string;
 }
 
+// 프로필 생성 함수
+export const createProfile = async (userId: string, email: string): Promise<UserProfile | null> => {
+  const sb = getSupabase();
+  const profileData = {
+    id: userId,
+    email: email,
+    credits: 5,
+    daily_ad_count: 0,
+    last_ad_date: new Date().toISOString().split('T')[0],
+  };
+
+  console.log('프로필 생성 시도:', profileData);
+
+  const { data: insertData, error: insertError } = await sb
+    .from('profiles')
+    .upsert(profileData, { onConflict: 'id' })
+    .select()
+    .single();
+
+  if (insertError) {
+    console.error('프로필 생성 오류 상세:', {
+      message: insertError.message,
+      details: insertError.details,
+      hint: insertError.hint,
+      code: insertError.code,
+    });
+    return null;
+  }
+
+  console.log('프로필 생성 성공:', insertData);
+  return insertData;
+};
+
 // 회원가입
-export const signUp = async (email: string, password: string): Promise<{ user: SupabaseUser | null; error: string | null }> => {
+export const signUp = async (email: string, password: string): Promise<{ user: SupabaseUser | null; profile: UserProfile | null; error: string | null }> => {
   try {
     console.log('회원가입 시도:', email);
     const sb = getSupabase();
@@ -48,46 +81,38 @@ export const signUp = async (email: string, password: string): Promise<{ user: S
 
     if (error) {
       console.error('회원가입 오류:', error);
-      return { user: null, error: error.message };
+      return { user: null, profile: null, error: error.message };
+    }
+
+    // 이메일 확인이 필요한 경우 체크
+    if (data.user && !data.session) {
+      console.log('이메일 확인 필요 - 세션 없음');
+      // 이메일 확인이 필요한 경우에도 프로필은 생성 시도
     }
 
     // 프로필 수동 생성 (트리거가 실패할 경우 대비)
+    let profile: UserProfile | null = null;
     if (data.user) {
       console.log('사용자 생성됨:', data.user.id);
+      profile = await createProfile(data.user.id, data.user.email || email);
 
-      // 프로필 직접 생성 시도
-      const profileData = {
-        id: data.user.id,
-        email: data.user.email || email,
-        credits: 5,
-        daily_ad_count: 0,
-        last_ad_date: new Date().toISOString().split('T')[0],
-      };
-      console.log('프로필 생성 시도:', profileData);
-
-      const { data: insertData, error: insertError } = await sb.from('profiles').upsert(profileData).select();
-
-      if (insertError) {
-        console.error('프로필 생성 오류 상세:', {
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint,
-          code: insertError.code,
-        });
-      } else {
-        console.log('프로필 생성 성공:', insertData);
+      // 프로필 생성 실패 시 재시도 (약간의 딜레이 후)
+      if (!profile) {
+        console.log('프로필 생성 실패, 1초 후 재시도...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        profile = await createProfile(data.user.id, data.user.email || email);
       }
     }
 
-    return { user: data.user, error: null };
+    return { user: data.user, profile, error: null };
   } catch (err: any) {
     console.error('회원가입 예외:', err);
-    return { user: null, error: err.message || '회원가입 중 오류 발생' };
+    return { user: null, profile: null, error: err.message || '회원가입 중 오류 발생' };
   }
 };
 
 // 로그인
-export const signIn = async (email: string, password: string): Promise<{ user: SupabaseUser | null; error: string | null }> => {
+export const signIn = async (email: string, password: string): Promise<{ user: SupabaseUser | null; profile: UserProfile | null; error: string | null }> => {
   const sb = getSupabase();
 
   const { data, error } = await sb.auth.signInWithPassword({
@@ -96,10 +121,22 @@ export const signIn = async (email: string, password: string): Promise<{ user: S
   });
 
   if (error) {
-    return { user: null, error: error.message };
+    return { user: null, profile: null, error: error.message };
   }
 
-  return { user: data.user, error: null };
+  // 로그인 성공 시 프로필 조회, 없으면 자동 생성
+  let profile: UserProfile | null = null;
+  if (data.user) {
+    profile = await getUserProfile(data.user.id);
+
+    // 프로필이 없으면 생성 (이전 버그로 프로필이 없는 경우 대응)
+    if (!profile) {
+      console.log('기존 사용자 프로필 없음, 새로 생성...');
+      profile = await createProfile(data.user.id, data.user.email || email);
+    }
+  }
+
+  return { user: data.user, profile, error: null };
 };
 
 // 로그아웃

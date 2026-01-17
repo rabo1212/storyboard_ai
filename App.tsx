@@ -14,6 +14,7 @@ import {
   UserProfile,
   getCurrentUser,
   getUserProfile,
+  createProfile,
   signOut,
   onAuthStateChange,
   addCredits,
@@ -40,7 +41,14 @@ const App: React.FC = () => {
       try {
         const user = await getCurrentUser();
         if (user) {
-          const profile = await getUserProfile(user.id);
+          let profile = await getUserProfile(user.id);
+
+          // 프로필이 없으면 자동 생성
+          if (!profile) {
+            console.log('앱 초기화: 프로필 없음, 자동 생성 시도...');
+            profile = await createProfile(user.id, user.email || '');
+          }
+
           setCurrentUser(profile);
         }
       } catch (err) {
@@ -55,7 +63,14 @@ const App: React.FC = () => {
     // 인증 상태 변경 구독
     const { data: { subscription } } = onAuthStateChange(async (user) => {
       if (user) {
-        const profile = await getUserProfile(user.id);
+        let profile = await getUserProfile(user.id);
+
+        // 프로필이 없으면 자동 생성
+        if (!profile) {
+          console.log('인증 상태 변경: 프로필 없음, 자동 생성 시도...');
+          profile = await createProfile(user.id, user.email || '');
+        }
+
         setCurrentUser(profile);
       } else {
         setCurrentUser(null);

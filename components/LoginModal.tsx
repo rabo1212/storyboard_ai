@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { signUp, signIn, getUserProfile, UserProfile } from '../services/supabaseService.ts';
+import { signUp, signIn, UserProfile } from '../services/supabaseService.ts';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -25,47 +25,49 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
     try {
       if (isSignUp) {
         // 회원가입
-        const { user, error: signUpError } = await signUp(email, password);
+        const { user, profile, error: signUpError } = await signUp(email, password);
 
         if (signUpError) {
           if (signUpError.includes('already registered')) {
             setError('이미 가입된 이메일입니다.');
+          } else if (signUpError.includes('email')) {
+            setError('유효한 이메일 주소를 입력해주세요.');
           } else {
             setError(signUpError);
           }
           return;
         }
 
-        if (user) {
-          const profile = await getUserProfile(user.id);
-          if (profile) {
-            onLoginSuccess(profile);
-            alert('회원가입을 축하합니다! 5 크레딧이 지급되었습니다.');
-          }
+        if (user && profile) {
+          onLoginSuccess(profile);
+          alert('회원가입을 축하합니다! 5 크레딧이 지급되었습니다.');
+        } else if (user && !profile) {
+          // 이메일 확인이 필요하거나 프로필 생성 실패
+          setError('회원가입은 완료되었으나 프로필 생성에 실패했습니다. 다시 로그인해주세요.');
         }
       } else {
         // 로그인
-        const { user, error: signInError } = await signIn(email, password);
+        const { user, profile, error: signInError } = await signIn(email, password);
 
         if (signInError) {
           if (signInError.includes('Invalid login credentials')) {
             setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+          } else if (signInError.includes('Email not confirmed')) {
+            setError('이메일 인증이 필요합니다. 이메일을 확인해주세요.');
           } else {
             setError(signInError);
           }
           return;
         }
 
-        if (user) {
-          const profile = await getUserProfile(user.id);
-          if (profile) {
-            onLoginSuccess(profile);
-          } else {
-            setError('프로필을 불러올 수 없습니다.');
-          }
+        if (user && profile) {
+          onLoginSuccess(profile);
+        } else if (user && !profile) {
+          setError('프로필을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.');
         }
       }
     } catch (err: any) {
+      console.error('인증 오류:', err);
       setError(err.message || '오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
