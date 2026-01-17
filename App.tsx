@@ -14,7 +14,8 @@ import TermsPage from './pages/TermsPage.tsx';
 import AboutPage from './pages/AboutPage.tsx';
 import ContactPage from './pages/ContactPage.tsx';
 import { StoryboardProject, PanelStatus, ART_STYLES, PricingTier } from './types.ts';
-import { generateStoryboardScript, generatePanelImage, generateStyleContext } from './services/geminiService.ts';
+// OpenAI 서비스로 변경
+import { generateStoryboardScript, generatePanelImage, generateStyleContext } from './services/openaiService.ts';
 import { parsePaymentSuccess, parsePaymentFail } from './services/paymentService.ts';
 import {
   UserProfile,
@@ -232,19 +233,21 @@ const App: React.FC = () => {
       setIsGenerating(false);
 
       // 모든 패널에 동일한 스타일 컨텍스트와 샷 타입 적용
-      initialPanels.forEach(async (panel) => {
+      // 순차적으로 생성 (DALL-E API 속도 제한 고려)
+      for (const panel of initialPanels) {
         try {
           const imageUrl = await generatePanelImage(
             panel.visualPrompt, 
             artStyle, 
             styleContext,
-            panel.shotType  // 샷 타입 전달
+            panel.shotType
           );
           updatePanel(panel.id, { imageUrl, isImageLoading: false });
-        } catch (err) {
+        } catch (err: any) {
+          console.error('이미지 생성 오류:', err);
           updatePanel(panel.id, { isImageLoading: false });
         }
-      });
+      }
     } catch (err: any) {
       setError(err.message || "생성 중 오류 발생");
       setIsGenerating(false);
@@ -286,7 +289,7 @@ const App: React.FC = () => {
         panel.visualPrompt, 
         project.style, 
         project.styleContext,
-        panel.shotType  // 샷 타입 전달
+        panel.shotType
       );
       updatePanel(panelId, { imageUrl, isImageLoading: false });
     } catch (err) {
@@ -472,11 +475,6 @@ const App: React.FC = () => {
         }
       }
       
-      // 마지막으로 row가 증가했으면 yPosition 업데이트
-      if (col === 0 && row > 0) {
-        // 이미 다음 행으로 넘어감
-      }
-      
       // ===== 푸터 =====
       const lastPage = pdf.getNumberOfPages();
       for (let p = 1; p <= lastPage; p++) {
@@ -575,7 +573,7 @@ const App: React.FC = () => {
               </button>
               <div className="text-center">
                 <h2 className="text-2xl font-bold">{project.title}</h2>
-                <p className="text-sm text-gray-500">{project.style} 스타일</p>
+                <p className="text-sm text-gray-500">{project.style} 스타일 • DALL-E 3</p>
               </div>
               <div className="flex gap-2">
                 <button 
