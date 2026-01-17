@@ -160,8 +160,8 @@ const ContactPage: React.FC = () => {
                   <span className="text-2xl">📧</span>
                   <div>
                     <h3 className="font-bold text-white">이메일</h3>
-                    <a href="mailto:support@visionary-ai.com" className="text-indigo-400 hover:text-indigo-300">
-                      support@visionary-ai.com
+                    <a href="mailto:rnu301@gmail.com" className="text-indigo-400 hover:text-indigo-300">
+                      rnu301@gmail.com
                     </a>
                     <p className="text-gray-400 text-sm mt-1">일반 문의 및 기술 지원</p>
                   </div>
@@ -171,8 +171,8 @@ const ContactPage: React.FC = () => {
                   <span className="text-2xl">💼</span>
                   <div>
                     <h3 className="font-bold text-white">비즈니스 문의</h3>
-                    <a href="mailto:business@visionary-ai.com" className="text-indigo-400 hover:text-indigo-300">
-                      business@visionary-ai.com
+                    <a href="mailto:rnu301@gmail.com" className="text-indigo-400 hover:text-indigo-300">
+                      rnu301@gmail.com
                     </a>
                     <p className="text-gray-400 text-sm mt-1">제휴 및 협업 문의</p>
                   </div>
