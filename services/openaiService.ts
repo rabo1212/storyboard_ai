@@ -187,23 +187,27 @@ export const generatePanelImage = async (
   // 샷 타입 설명
   const shotDescription = shotType ? getShotDescription(shotType) : 'medium shot';
 
-  // DALL-E 프롬프트 구성
+  // DALL-E 프롬프트 구성 - 단일 씬 이미지로 명확히 지시
   let finalPrompt: string;
   
   if (styleContext) {
     finalPrompt = `${styleContext}
 
-SHOT TYPE: ${shotDescription}
+CAMERA: ${shotDescription}
 
 SCENE: ${visualPrompt}
 
-Style: ${style}, cinematic storyboard frame, professional lighting, no text, no watermarks`;
+IMPORTANT: Generate a SINGLE clean image of this ONE scene only. No collages, no multiple frames, no UI elements, no timelines, no color palettes, no text overlays.
+
+Style: ${style}, cinematic film still, professional lighting, photorealistic rendering`;
   } else {
-    finalPrompt = `SHOT TYPE: ${shotDescription}
+    finalPrompt = `CAMERA: ${shotDescription}
 
-${visualPrompt}
+SCENE: ${visualPrompt}
 
-Style: ${style}, cinematic storyboard frame, professional lighting, no text, no watermarks`;
+IMPORTANT: Generate a SINGLE clean image of this ONE scene only. No collages, no multiple frames, no UI elements, no timelines, no color palettes, no text overlays.
+
+Style: ${style}, cinematic film still, professional lighting, photorealistic rendering`;
   }
 
   // 프롬프트 길이 제한 (DALL-E 3는 4000자 제한)
