@@ -316,6 +316,29 @@ const App: React.FC = () => {
     try {
       const element = storyboardRef.current;
       
+      // 이미지 로딩 완료 대기 함수
+      const waitForImages = async (container: HTMLElement) => {
+        const images = container.querySelectorAll('img');
+        const promises = Array.from(images).map(img => {
+          if (img.complete && img.naturalHeight !== 0) {
+            return Promise.resolve();
+          }
+          return new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+            // 타임아웃 5초
+            setTimeout(() => resolve(), 5000);
+          });
+        });
+        await Promise.all(promises);
+      };
+      
+      // 이미지 로딩 대기
+      await waitForImages(element);
+      
+      // 잠시 대기 (렌더링 안정화)
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // html2canvas로 전체 캡처 (화면 그대로 캡처 - 한글 OK)
       const canvas = await html2canvas(element, {
         scale: 2, // 고해상도
@@ -323,6 +346,21 @@ const App: React.FC = () => {
         allowTaint: true,
         backgroundColor: '#0a0a0a',
         logging: false,
+        imageTimeout: 15000,
+        onclone: async (clonedDoc) => {
+          // 클론된 문서의 이미지도 로딩 대기
+          const clonedImages = clonedDoc.querySelectorAll('img');
+          await Promise.all(
+            Array.from(clonedImages).map(img => {
+              if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+              return new Promise<void>(resolve => {
+                img.onload = () => resolve();
+                img.onerror = () => resolve();
+                setTimeout(() => resolve(), 5000);
+              });
+            })
+          );
+        }
       });
       
       const imgData = canvas.toDataURL('image/png');
