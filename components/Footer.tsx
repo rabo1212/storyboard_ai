@@ -7,7 +7,7 @@ const Footer: React.FC = () => {
   return (
     <footer className="bg-black/50 border-t border-white/5 mt-auto">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* 브랜드 섹션 */}
           <div className="md:col-span-1">
             <Link to="/" className="inline-block mb-4">
@@ -26,11 +26,6 @@ const Footer: React.FC = () => {
             <h4 className="text-white font-bold mb-4">서비스</h4>
             <ul className="space-y-2">
               <li>
-                <Link to="/" className="text-gray-400 hover:text-white transition-colors text-sm">
-                  스토리보드 생성
-                </Link>
-              </li>
-              <li>
                 <Link to="/about" className="text-gray-400 hover:text-white transition-colors text-sm">
                   서비스 소개
                 </Link>
@@ -38,35 +33,13 @@ const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* 지원 링크 */}
+          {/* 고객지원 링크 */}
           <div>
             <h4 className="text-white font-bold mb-4">고객지원</h4>
             <ul className="space-y-2">
               <li>
                 <Link to="/contact" className="text-gray-400 hover:text-white transition-colors text-sm">
                   문의하기
-                </Link>
-              </li>
-              <li>
-                <a href="mailto:support@visionary-ai.com" className="text-gray-400 hover:text-white transition-colors text-sm">
-                  이메일 문의
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* 법적 링크 */}
-          <div>
-            <h4 className="text-white font-bold mb-4">약관 및 정책</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/terms" className="text-gray-400 hover:text-white transition-colors text-sm">
-                  이용약관
-                </Link>
-              </li>
-              <li>
-                <Link to="/privacy" className="text-gray-400 hover:text-white transition-colors text-sm">
-                  개인정보처리방침
                 </Link>
               </li>
             </ul>
@@ -85,9 +58,6 @@ const Footer: React.FC = () => {
               </Link>
               <Link to="/privacy" className="text-gray-500 hover:text-gray-300 text-sm transition-colors">
                 개인정보처리방침
-              </Link>
-              <Link to="/contact" className="text-gray-500 hover:text-gray-300 text-sm transition-colors">
-                문의하기
               </Link>
             </div>
           </div>
