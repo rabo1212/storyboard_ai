@@ -44,7 +44,7 @@ const PromptForm: React.FC<PromptFormProps> = ({ onSubmit, isLoading, userCredit
           <textarea
             required
             className="w-full h-40 bg-black/40 border border-white/10 rounded-2xl p-6 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all resize-none placeholder-gray-600"
-            placeholder="예: 네오 도쿄의 마천루 위에서 비를 맞으며 네온사인을 바라보는 사이보그 사무라이..."
+            placeholder="예: 카페에서 노트북으로 작업하던 주인공이 창밖의 비를 바라보며 과거를 회상한다. 이어서 1년 전 같은 장소에서 연인과 처음 만났던 장면으로 전환..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
