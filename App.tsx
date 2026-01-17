@@ -1,12 +1,18 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import Header from './components/Header.tsx';
+import Footer from './components/Footer.tsx';
 import PromptForm from './components/PromptForm.tsx';
 import StoryboardPanel from './components/StoryboardPanel.tsx';
 import PricingModal from './components/PricingModal.tsx';
 import LoginModal from './components/LoginModal.tsx';
 import AdPlayer from './components/AdPlayer.tsx';
 import AdBanner from './components/AdBanner.tsx';
+import PrivacyPage from './pages/PrivacyPage.tsx';
+import TermsPage from './pages/TermsPage.tsx';
+import AboutPage from './pages/AboutPage.tsx';
+import ContactPage from './pages/ContactPage.tsx';
 import { StoryboardProject, PanelStatus, ART_STYLES, PricingTier } from './types.ts';
 import { generateStoryboardScript, generatePanelImage, generateStyleContext } from './services/geminiService.ts';
 import { parsePaymentSuccess, parsePaymentFail } from './services/paymentService.ts';
@@ -285,8 +291,9 @@ const App: React.FC = () => {
     lastAdDate: currentUser.last_ad_date,
   } : null;
 
-  return (
-    <div className="min-h-screen flex flex-col">
+  // 홈 페이지 콘텐츠
+  const HomePage = () => (
+    <>
       <Header
         credits={currentUser?.credits || 0}
         user={userForHeader}
@@ -332,6 +339,8 @@ const App: React.FC = () => {
         </div>
       </main>
 
+      <Footer />
+
       <PricingModal
         isOpen={isPricingOpen} onClose={handleClosePricing}
         onPurchase={handlePurchase} onWatchAd={handleWatchAdTrigger}
@@ -340,6 +349,18 @@ const App: React.FC = () => {
       />
       <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />
       <AdPlayer isOpen={isAdPlaying} onComplete={handleAdComplete} onCancel={handleAdCancel} />
+    </>
+  );
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/privacy" element={<><PrivacyPage /><Footer /></>} />
+        <Route path="/terms" element={<><TermsPage /><Footer /></>} />
+        <Route path="/about" element={<><AboutPage /><Footer /></>} />
+        <Route path="/contact" element={<><ContactPage /><Footer /></>} />
+      </Routes>
     </div>
   );
 };
