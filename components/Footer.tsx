@@ -50,9 +50,15 @@ const Footer: React.FC = () => {
         {/* 하단 구분선 및 저작권 */}
         <div className="border-t border-white/5 mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-gray-500 text-sm">
-              © {currentYear} Visionary Storyboard AI. All rights reserved.
-            </p>
+            <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4">
+              <p className="text-gray-500 text-sm">
+                © {currentYear} Visionary Storyboard AI. All rights reserved.
+              </p>
+              <span className="hidden md:inline text-gray-600">|</span>
+              <p className="text-gray-600 text-xs tracking-wider">
+                Studio RNU
+              </p>
+            </div>
             <div className="flex items-center gap-6">
               <Link to="/terms" className="text-gray-500 hover:text-gray-300 text-sm transition-colors">
                 이용약관
