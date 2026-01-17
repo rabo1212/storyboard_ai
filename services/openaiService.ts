@@ -49,7 +49,7 @@ const getShotDescription = (shotType: string): string => {
   return `${shotType} shot, cinematic framing`;
 };
 
-// 스타일 일관성을 위한 컨텍스트 생성 (문맥 파악 버전)
+// 스타일 일관성을 위한 컨텍스트 생성 (아트 스타일만)
 export const generateStyleContext = async (prompt: string, style: string): Promise<string> => {
   const openai = getOpenAI();
   
@@ -58,46 +58,24 @@ export const generateStyleContext = async (prompt: string, style: string): Promi
     messages: [
       {
         role: 'system',
-        content: `You are a visual consistency expert for storyboards. Analyze the story and create a style guide.
-
-CRITICAL RULES:
-1. ONLY describe characters/subjects that are EXPLICITLY mentioned or clearly implied in the story
-2. If the story is about animals, describe ONLY the animals - DO NOT add human characters
-3. If the story is about objects/things, describe ONLY those objects - DO NOT add characters
-4. If the story mentions specific people, describe ONLY those people
-5. NEVER invent or add characters that are not in the original story
-
-Output only the style guide, no explanations.`
+        content: `You are an art director. Create ONLY an art style guide. DO NOT describe any characters, people, or animals. Focus only on visual style.`
       },
       {
         role: 'user',
-        content: `Story: "${prompt}"
+        content: `Story theme: "${prompt}"
 Art Style: ${style}
 
-Analyze this story and create a VISUAL CONSISTENCY GUIDE.
+Create an ART STYLE GUIDE with ONLY:
+- Color palette (warm/cool/vibrant/muted)
+- Lighting style (golden hour/soft/dramatic/natural)
+- Rendering style (photorealistic/3D animated/painted/illustrated)
+- Mood/atmosphere (peaceful/energetic/mysterious/cheerful)
 
-First, identify what the story is actually about:
-- Is it about animals? → Describe only the animals
-- Is it about people? → Describe only those people  
-- Is it about objects/scenes? → Describe only those elements
-- Is it abstract/conceptual? → Focus only on art style
-
-Then create a guide with:
-1. SUBJECTS (only what's in the story):
-   - For animals: species, fur/feather color, eye color, size, distinctive markings
-   - For people: only if explicitly mentioned in story
-   - For objects: material, color, condition
-
-2. ART STYLE:
-   - Color palette
-   - Lighting style
-   - Visual style (${style})
-
-Output as a single paragraph starting with "STYLE:" - keep it under 150 words.
-DO NOT add any characters or subjects not mentioned in the original story.`
+DO NOT mention any characters, animals, people, or specific subjects.
+Output as one short paragraph starting with "ART STYLE:" - maximum 50 words.`
       }
     ],
-    max_tokens: 400,
+    max_tokens: 150,
     temperature: 0.5,
   });
 
@@ -115,10 +93,12 @@ export const generateStoryboardScript = async (prompt: string, panelCount: numbe
         role: 'system',
         content: `You are a professional storyboard artist. Create storyboard panels in JSON format.
 
-CRITICAL: Only include characters/subjects that are explicitly mentioned in the user's prompt.
-- If the prompt is about animals, show ONLY animals
-- If the prompt is about people, show ONLY those people
-- DO NOT add random human characters to animal stories
+CRITICAL RULES:
+1. Each panel's visualPrompt must describe EXACTLY what is described in that scene - no more, no less
+2. If a scene has 1 character, show 1. If it has 5 characters, show 5.
+3. visualPrompt should be SELF-CONTAINED - include all necessary details for that specific scene
+4. DO NOT carry over characters from other scenes unless they are mentioned in that specific scene
+5. Parse the scene description carefully to understand WHO and WHAT should appear
         
 Output ONLY valid JSON array, no markdown, no explanations.`
       },
@@ -129,10 +109,11 @@ Output ONLY valid JSON array, no markdown, no explanations.`
 
 규칙:
 1. description은 한국어로 작성
-2. visualPrompt는 영어로, DALL-E에 최적화된 상세한 설명
-3. 프롬프트에 언급된 캐릭터/대상만 포함 (임의로 사람 추가 금지)
-4. 모든 패널에서 같은 캐릭터는 동일한 외모로 묘사
-5. shotType은 다음 중 선택: EXTREME WIDE SHOT, WIDE SHOT, FULL SHOT, MEDIUM WIDE SHOT, MEDIUM SHOT, MEDIUM CLOSE-UP, CLOSE-UP, EXTREME CLOSE-UP, OVER THE SHOULDER, TWO SHOT
+2. visualPrompt는 영어로, 해당 씬에 등장하는 모든 요소를 정확히 묘사
+3. 씬에 1명이면 1명, 2명이면 2명, 동물 3마리면 3마리 - 정확히 맞춰서
+4. 다른 씬의 캐릭터를 가져오지 말 것 (해당 씬에 언급된 것만)
+5. visualPrompt는 독립적으로 완전한 설명이어야 함 (배경, 조명, 인물 외모 등 포함)
+6. shotType은 장면에 맞게: WIDE SHOT, MEDIUM SHOT, CLOSE-UP, TWO SHOT 등
 
 JSON 형식:
 [
@@ -141,7 +122,7 @@ JSON 형식:
     "shotType": "MEDIUM SHOT",
     "description": "한국어 장면 설명",
     "dialogue": "대사 (없으면 빈 문자열)",
-    "visualPrompt": "Detailed English description - include ONLY subjects from the original prompt"
+    "visualPrompt": "Complete scene description in English. Include: all characters/subjects IN THIS SCENE ONLY, their appearance, actions, setting, lighting, mood. Be specific and self-contained."
   }
 ]`
       }
