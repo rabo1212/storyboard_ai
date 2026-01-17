@@ -10,20 +10,40 @@ const getAI = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-// 스타일 일관성을 위한 컨텍스트 생성
+// 스타일 일관성을 위한 컨텍스트 생성 (캐릭터 일관성 강화)
 export const generateStyleContext = async (prompt: string, style: string): Promise<string> => {
   const ai = getAI();
   const response = await ai.models.generateContent({
     model: 'gemini-2.0-flash',
     contents: `Based on this story: "${prompt}"
 
-Create a consistent visual style guide for a ${style} storyboard. Include:
-1. Character descriptions (age, hair color, clothing, distinctive features)
-2. Color palette (main colors, lighting mood)
-3. Environment style (setting details, atmosphere)
-4. Art direction notes (line weight, shading style, level of detail)
+You are creating a CHARACTER CONSISTENCY GUIDE for a ${style} storyboard. This guide will be used as a PREFIX for every image generation to ensure ALL characters look IDENTICAL across all panels.
 
-Output as a single paragraph in English that can be used as a prefix for image generation prompts to maintain visual consistency across all panels.`,
+Create an extremely detailed and specific character description including:
+
+1. MAIN CHARACTER (most important - be VERY specific):
+   - Exact age (e.g., "27 years old")
+   - Face shape (e.g., "oval face with soft jawline")
+   - Eye details (e.g., "monolid dark brown eyes, thick eyebrows")
+   - Hair (e.g., "short black hair, side-parted, slightly messy")
+   - Skin tone (e.g., "fair skin with warm undertone")
+   - Body type (e.g., "slim build, 175cm tall")
+   - Clothing (e.g., "charcoal grey suit, white dress shirt, no tie, top button undone")
+   - Distinctive features (e.g., "small mole under left eye")
+
+2. SECONDARY CHARACTERS (if any):
+   - Same level of detail as main character
+
+3. ART STYLE CONSISTENCY:
+   - Color palette (e.g., "warm oranges, soft yellows, muted browns")
+   - Lighting style (e.g., "soft ambient lighting with warm glow")
+   - Line weight and rendering style
+   - Level of detail and realism
+
+Output as a single, detailed paragraph in English that starts with "CONSISTENT CHARACTER:" followed by all details. This will be prepended to every image prompt to maintain visual consistency.
+
+Example format:
+"CONSISTENT CHARACTER: A 27-year-old Korean man with an oval face, monolid dark brown eyes, thick straight eyebrows, short black side-parted slightly messy hair, fair skin with warm undertone, slim build. He wears a charcoal grey suit with white dress shirt, no tie, top button undone. Small mole under left eye. ART STYLE: Anime-influenced illustration with soft warm lighting, color palette of warm oranges and muted browns, clean linework with soft cel-shading."`,
   });
 
   return response.text || '';
@@ -35,12 +55,20 @@ export const generateStoryboardScript = async (prompt: string, panelCount: numbe
     model: 'gemini-2.0-flash',
     contents: `스토리보드 생성: ${prompt}, 패널수: ${panelCount}.
 
-규칙:
+중요 규칙:
 1. 한국어로 설명(description) 작성
 2. visualPrompt는 영어로 작성
-3. 모든 패널에서 캐릭터의 외모, 의상, 특징을 동일하게 유지
-4. 캐릭터 묘사 시 구체적인 특징 포함 (머리색, 의상 색상, 체형 등)
-5. 배경과 조명 스타일도 일관되게 유지`,
+3. ⚠️ 매우 중요: 모든 패널에서 캐릭터의 외모를 100% 동일하게 유지
+4. visualPrompt에 캐릭터 외모 묘사를 매번 상세히 포함할 것:
+   - 나이, 성별, 얼굴형
+   - 머리 스타일과 색상
+   - 의상 (색상, 스타일 구체적으로)
+   - 체형
+5. 같은 캐릭터는 모든 장면에서 완전히 동일한 외모 묘사 사용
+6. 배경과 조명 스타일도 일관되게 유지
+
+예시 visualPrompt 형식:
+"A 27-year-old Korean man with short black side-parted hair, oval face, wearing charcoal grey suit and white shirt, slim build - [장면 설명]"`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -79,15 +107,34 @@ export const generatePanelImage = async (
 ): Promise<string> => {
   const ai = getAI();
 
-  // 스타일 컨텍스트를 포함한 일관된 프롬프트 생성
-  const consistentPrompt = styleContext
-    ? `${styleContext}. Scene: ${visualPrompt}`
-    : `Storyboard frame, ${style} style, ${visualPrompt}`;
+  // 스타일 컨텍스트(캐릭터 정보)를 강하게 포함한 프롬프트 생성
+  let finalPrompt: string;
+  
+  if (styleContext) {
+    // 캐릭터 일관성 컨텍스트를 맨 앞에 배치하여 강조
+    finalPrompt = `${styleContext}
+
+SCENE TO ILLUSTRATE: ${visualPrompt}
+
+CRITICAL: The character must look EXACTLY as described in the CONSISTENT CHARACTER section above. Same face, same hair, same clothing, same body type in every frame.`;
+  } else {
+    finalPrompt = `Storyboard frame, ${style} style, ${visualPrompt}`;
+  }
 
   // Gemini 2.0 Flash 이미지 생성 모델 사용
   const response = await ai.models.generateContent({
     model: 'gemini-2.0-flash-exp',
-    contents: `Generate an image: ${consistentPrompt}, cinematic composition, professional lighting, consistent character design, no text, no watermark, high quality storyboard frame`,
+    contents: `Generate an image: ${finalPrompt}
+
+Additional requirements:
+- Maintain exact character appearance consistency
+- ${style} art style
+- Cinematic composition
+- Professional lighting
+- No text overlays
+- No watermarks
+- High quality storyboard frame
+- Same character design as specified`,
     config: {
       responseModalities: ['image', 'text'],
     },
